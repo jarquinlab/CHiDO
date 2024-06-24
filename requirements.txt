@@ -1,0 +1,13 @@
+shiny
+shinyjs
+shinyjqui
+shinydashboard
+dplyr
+ggplot2
+viridis
+scales
+gridExtra
+DT
+zip
+markdown
+BGLR

@@ -13,6 +13,5 @@ about_md <- markdown::renderMarkdown(file="README.md")
 
 about_tab <- tabItem(
   tabName = "about",
-  h1("CHiDO (Characterization & Integration of Driven Omics)", class="tab-header"),
   HTML(about_md)
 )
