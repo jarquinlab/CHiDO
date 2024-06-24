@@ -7,7 +7,7 @@ source("code/functions/utils.R")
 ### UI instructions ----
 ### Supporting objects ----
 
-about_md <- markdown::renderMarkdown(file="README.Rmd")
+about_md <- markdown::renderMarkdown(file="README.md")
 
 ### Main tab ----
 
