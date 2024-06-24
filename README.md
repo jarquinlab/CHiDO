@@ -1,4 +1,4 @@
-!(https://img.shields.io/badge/license-AGPL-blue.svg)
+![](https://img.shields.io/badge/license-AGPL-blue.svg)
 
 # CHiDO
 
