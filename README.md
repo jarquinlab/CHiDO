@@ -1,8 +1,4 @@
----
-editor_options: 
-  markdown: 
-    wrap: 72
----
+!(https://img.shields.io/badge/license-AGPL-blue.svg)
 
 # CHiDO
 
@@ -153,6 +149,10 @@ You can view your results in two methods, as tables or graphs. In addition to th
 - Variance components
 
 These results can be downloaded as a zip folder and the contents are split by model tested. For each model, there will be CSV files containing the raw results for each CV selected, PNG files with images of the plots generated, an RDA object containing the fitted model, and RDS files for each plot (created with ggplot2). A sample output can be located in the [example](https://github.com/jarquinlab/CHiDO/example) folder.
+
+## License
+
+This project is licensed under the GNU Affero General Public License - see the [LICENSE](LICENSE) file for details.
 
 ## Contact
 
