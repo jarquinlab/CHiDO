@@ -8,7 +8,7 @@ library(gridExtra)
 library(BGLR)
 library(dplyr)
 
-source("ui.R")
-source("server.R")
+source("code/ui.R")
+source("code/server.R")
 
 shinyApp(ui,server)

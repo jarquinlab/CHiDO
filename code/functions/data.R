@@ -1,4 +1,4 @@
-source("functions/utils.R")
+source("code/functions/utils.R")
 
 # Load file data and return a data.frame object
 load_data <- function(path = NULL) {

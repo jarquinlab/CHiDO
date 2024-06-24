@@ -2,7 +2,7 @@
 # Last updated by: Francisco Gonzalez
 # Last updated: 06/09/2024
 
-source("functions/utils.R")
+source("code/functions/utils.R")
 
 ### UI instructions ----
 ### Supporting objects ----

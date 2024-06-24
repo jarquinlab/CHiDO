@@ -2,11 +2,11 @@
 # Last updated by: Francisco Gonzalez
 # Last updated: 06/09/2024
 
-source("ui/data_tab.R")
-source("ui/model_tab.R")
-source("ui/cv_tab.R")
-source("ui/results_tab.R")
-source("ui/about_tab.R")
+source("code/ui/data_tab.R")
+source("code/ui/model_tab.R")
+source("code/ui/cv_tab.R")
+source("code/ui/results_tab.R")
+source("code/ui/about_tab.R")
 
 body <- dashboardBody(
   # Enable JavaScript

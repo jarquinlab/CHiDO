@@ -8,7 +8,7 @@ library(DT)
 library(shinyjqui)
 library(shinyjs)
 
-source("functions/utils.R")
+source("code/functions/utils.R")
 
 ### UI instructions ----
 

@@ -14,10 +14,10 @@ library(gridExtra)
 ### Loading source files ----
 
 # Import functions for server
-source("functions/utils.R")
-source("functions/data.R")
-source("functions/model.R")
-source("functions/metrics.R")
+source("code/functions/utils.R")
+source("code/functions/data.R")
+source("code/functions/model.R")
+source("code/functions/metrics.R")
 
 create_temp_dir <- function() {
   tmpdir <- tempdir()
