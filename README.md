@@ -85,8 +85,9 @@ menu will be displayed where you can select how the ID column should be linked b
 
 ### 2/ Model assembly
 
-Every omic uploaded will have a label (e.g., G for genomics) and this label will be displayed as a draggable icon in the _Model Assembly_ page. In the top-left box (image below), all omics available will be displayed via their labels and can be added as terms
-to a linear mixed model as:
+Every omic uploaded will have a label (e.g., G for genomics) and this label will be displayed as a draggable icon in the _Model Assembly_ page. By default, the environment ID and genotype ID columns are used to create two random effects displayed with the labels E and L, respectively.
+
+In the top-left box (image below), all omics available will be displayed via their labels and can be added as terms to a linear mixed model as:
 
 - __Main effects__ by dragging a single label into the top-right box and pressing "Add".
 - __Interaction terms__ by dragging two or more labels into the top-right box and pressing "Add" (e.g., G and E are added together and shown as G*E in the model preview).
