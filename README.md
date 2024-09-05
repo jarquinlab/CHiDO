@@ -157,7 +157,7 @@ This project is licensed under the GNU Affero General Public License - see the [
 ## Contact
 
 For questions about using CHiDO, please visit our
-[documentation](https://github.com/jarquinlab/CHiDO/docs) page for
+[documentation](https://github.com/jarquinlab/CHiDO) page for
 guidance.
 
 If you encounter any issues with the application or have an idea to
