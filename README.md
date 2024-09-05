@@ -148,7 +148,7 @@ You can view your results in two methods, as tables or graphs. In addition to th
 - Root-mean-square-error (RMSE)
 - Variance components
 
-These results can be downloaded as a zip folder and the contents are split by model tested. For each model, there will be CSV files containing the raw results for each CV selected, PNG files with images of the plots generated, an RDA object containing the fitted model, and RDS files for each plot (created with ggplot2). A sample output can be located in the [example](https://github.com/jarquinlab/CHiDO/example) folder.
+These results can be downloaded as a zip folder and the contents are split by model tested. For each model, there will be CSV files containing the raw results for each CV selected, PNG files with images of the plots generated, an RDA object containing the fitted model, and RDS files for each plot (created with ggplot2). A sample output can be located in the [example](https://github.com/jarquinlab/CHiDO/tree/main/example) folder.
 
 ## License
 
