@@ -17,8 +17,8 @@ jobs:
 
       - name: Install dependencies
         run: |
-          install.packages('remotes')
-          remotes::install_cran('rsconnect')
+          Rscript -e 'install.packages("remotes")'
+	  Rscript -e 'install.packages(c("rsconnect"))'
 
       - name: Deploy to shinyapps.io
         env:
