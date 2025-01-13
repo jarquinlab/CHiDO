@@ -18,6 +18,11 @@ jobs:
         with:
           r-version: '4.1'  
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libcurl4-openssl-dev libssl-dev libxml2-dev
+
       - name: Install rsconnect
         run: |
           Rscript -e 'install.packages("rsconnect")'
@@ -29,7 +34,6 @@ jobs:
           SHINYAPPS_SECRET: ${{ secrets.SHINYAPPS_SECRET }}
         run: |
           Rscript -e '
-            library(rsconnect)
             rsconnect::setAccountInfo(
               name = Sys.getenv("SHINYAPPS_ACCOUNT"),
               token = Sys.getenv("SHINYAPPS_TOKEN"),
