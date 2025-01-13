@@ -1,7 +1,7 @@
 # CHiDO is a no-code platform to integrate multi-omics data to build, train and test
 # linear mixed models for identifying candidates for desired GxE interactions.
 #
-# Copyright (C) 2024 Francisco Gonzalez, Diego Jarquin, and Julian Garcia
+# Copyright (C) 2025 Francisco Gonzalez, Diego Jarquin, and Julian Garcia, Vitor Sagae
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -48,8 +48,8 @@ load_data <- function(path = NULL) {
 }
 
 # Create omic metadata list, no actual omic data is attached yet
-create_omic_config <- function(file, label, data_type, id_col, gid_col = NULL,
-                               eid_col = NULL, uid_col=NULL, link = NULL) {
+create_omic_config <- function(file, label, data_type,modtype, id_col, gid_col = NULL,
+                               g1id_col = NULL, g2id_col = NULL,eid_col = NULL, uid_col=NULL, link = NULL) {
   if(!is.null(file)) {
     
     config <- list(
@@ -59,22 +59,42 @@ create_omic_config <- function(file, label, data_type, id_col, gid_col = NULL,
     )
     
     if(label=="Y") {
+      if (modtype=="Genotype level"){
       config$trait_col <- as.integer(id_col)
       config$gid_col <- as.integer(gid_col)
       config$eid_col <- as.integer(eid_col)
       config$uid_col <- as.integer(uid_col)
+      }else{
+      config$trait_col <- as.integer(id_col)
+      config$gid_col <- as.integer(gid_col)
+      config$g1id_col <- as.integer(g1id_col)
+      config$g2id_col <- as.integer(g2id_col)
+      config$eid_col <- as.integer(eid_col)
+      config$uid_col <- as.integer(uid_col)
+      }
     } else {
       
+      if (modtype=="Genotype level"){
       if (tolower(data_type) %in% c("genomic markers", "pedigree data", "phenomic markers")) {
         linkage_type = "Genotype / Line ID"
       } else if (tolower(data_type) == "environmental markers") {
         linkage_type = "Environment ID"
       } else {
         linkage_type = link
+      }}else{
+        if (tolower(data_type) %in% c("genomic markers", "pedigree data", "phenomic markers")) {
+          linkage_type = link
+        } 
+          else if (tolower(data_type) == "environmental markers") {
+          linkage_type = link
+        } else {
+          linkage_type = link
+        }
       }
       
       config$id_col <- as.integer(id_col)
       config$linkage_type <- linkage_type
+      #config$uid_col<-as.integer(uid_col)
     }
     
     # Return omic metadata
@@ -86,9 +106,13 @@ create_omic_config <- function(file, label, data_type, id_col, gid_col = NULL,
   }
 }
 
-verify_omic_object <- function(config, phen = FALSE) {
+verify_omic_object <- function(config, phen = FALSE, modtype="Genotype level") {
   if(phen) {         # Data is from phenotype response (Y) file
+    if(modtype=="Genotype level"){
     req_fields <- c("gid_col", "eid_col", "trait_col")
+    }else{
+    req_fields <- c("gid_col","g1id_col","g2id_col", "eid_col", "trait_col") 
+    }
   } else {           # Data is from another (X) omic file (e.g. markers)
     req_fields <- c("label", "id_col")
   }
