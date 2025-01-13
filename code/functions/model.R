@@ -1,7 +1,7 @@
 # CHiDO is a no-code platform to integrate multi-omics data to build, train and test
 # linear mixed models for identifying candidates for desired GxE interactions.
 #
-# Copyright (C) 2024 Francisco Gonzalez, Diego Jarquin, and Julian Garcia
+# Copyright (C) 2025 Francisco Gonzalez, Diego Jarquin, and Julian Garcia, Vitor Sagae
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -42,12 +42,15 @@ get_join_id <- function(curr_term, y_data) {
     return(y_data$eid_col)
   } else if (curr_term$linkage_type == "Genotype / Line ID") {
     return(y_data$gid_col)
-  } else if (curr_term$linkage_type == "Compound ID / UID") {
+  } else if (curr_term$linkage_type == "Parent Group 1 ID") {
+    return(y_data$g1id_col)
+  } else if (curr_term$linkage_type == "Parent Group 2 ID") {
+    return(y_data$g2id_col)
+  } else if(curr_term$linkage_type == "Compound ID / UID") {
     return(y_data$uid_col)
-  } else {
-    return()
   }
-}
+  }
+
 
 # Filter genomic data sets to remove any markers that exceed NaN limit
 filter_markers <- function(data, nan_freq, out_path = NULL) {
@@ -84,36 +87,17 @@ create_z_matrix <- function(y_data, join_id) {
   return(as.matrix(model.matrix(~ids - 1)))
 }
 
-pre_process_data <- function(data, type, s, wht, ctr, std, nan_freq, prop_maf_j) {
+pre_process_data <- function(data, type, s, wht, ctr, std, prop_maf_j) {
   
   # TODO -- Ask Diego for examples to integrate 
   if(wht) {
     weight <- scan(weight.file, skip = 1)
   }
   
-  # Naive imputation
+  # Naive imputation, Centering, standardizing and adjusting weights
   for (i in 1:ncol(data)) {
     mean_i <- mean(data[, i], na.rm = TRUE)
     data[, i] <- ifelse(is.na(data[, i]), mean_i, data[, i])
-    s <- s + var(data[, i], na.rm=TRUE)
-  }
-  
-  # TODO -- Ask if this is necessary for any other omic except G
-  if (type != "phenomic markers") {
-    p <- colMeans(data, na.rm = T) / 2
-    p <- ifelse(p <= 0.5, p, 1 - p)
-  }
-  
-  # Filter for desired MAF proportion
-  if (type == "genetic markers" && !is.null(prop_maf_j)) {
-    # Look through columns in data to keep 
-    maf_idx <- which(p >= prop_maf_j)
-    data <- data[, maf_idx]
-  }
-  
-  # Centering, standardizing and adjusting weights
-  for (i in 1:ncol(data)) {
-    mean_i <- mean(data[, i], na.rm = TRUE)
     if (ctr) { data[, i] <- data[, i] - mean_i }
     if (std) {
       sd_i <- sd(data[, i])
@@ -122,10 +106,30 @@ pre_process_data <- function(data, type, s, wht, ctr, std, nan_freq, prop_maf_j)
       else { data[, i] <- data[, i] / sd_i }
     }
     if (wht) { data[, i] <- data[, i] * weight[i] }
+    s <- s + var(data[, i], na.rm=TRUE)
+  }
+
+  # TODO -- Ask if this is necessary for any other omic except G
+  if (type != "phenomic markers") {
+
   }
   
+  # Filter for desired MAF proportion
+  if (type == "genomic markers" && !is.null(prop_maf_j)) {
+    p <- colMeans(data, na.rm = T) / 2
+    p <- ifelse(p <= 0.5, p, 1 - p)
+    # Look through columns in data to keep 
+    maf_idx <- which(p >= prop_maf_j)
+    data <- data[, maf_idx]
+  }
+
+  # Centering, standardizing and adjusting weights
+  #for (i in 1:ncol(data)) {
+  #  mean_i <- mean(data[, i], na.rm = TRUE)
+  #}
+  
   # row x row -- Initial G but not final G matrix
-  if (type == "genomic markers") {
+  if (type %in% c("genomic markers")) {
     G <- tcrossprod(data) / s
   } else {
     G <- tcrossprod(data) / ncol(data)
@@ -142,39 +146,49 @@ create_g_matrix <- function(o_data, y_data, wht=FALSE, ctr=FALSE, std=FALSE,
   type <- o_data$type
   id_col <- o_data$id_col
   join_id <- o_data$y_col
-  
+
   ids <- factor(y_data$data[, join_id])
   Z <- as.matrix(model.matrix(~ids - 1))
 
   # No data, create G from Y values only
-  if (is.null(data) || o_data$label %in% c("E","L")) {
+  if (is.null(data) || o_data$label %in% c("E","L","L1","L2")) {
     
     d <- colSums(Z)
-    V <- Z / sqrt(d)
+    #V <- Z / sqrt(d)
     # Final G and EVD values
-    EVD <- list(vectors = V, values = d)
-    G <- tcrossprod(Z)
+    #EVD <- list(vectors = V, values = d)
+    #G <- tcrossprod(Z)
     
+    ## Adjusted
+    V<-Z
+    for(i in 1:ncol(Z)){ V[,i]<-V[,i]/sqrt(d[i]) } 
+    EVD<-list(vectors=V,values=d)
+    G<-tcrossprod(Z)
   } else {
     
     # Filter genomic data based on NaN threshold limit
-    if (type == "genomic markers") {
+    if (type %in% c("genomic markers")) {
       data <- filter_markers(data, nan_freq)
     }
     
     O <- as.matrix(data[,-id_col])
     rownames(O) <- data[[id_col]]
-  
+    
     if (type != "pedigree") {
       # Do the processing for data to reach initial G
       s <- 0
       GO <- pre_process_data(O, type, s, wht, ctr, std, prop_maf_j)
-      
+      rownames(GO)<-data[[id_col]]
+      colnames(GO)<-data[[id_col]]
+
       # Ensure all Y IDs 
       if(!all(ids %in% rownames(GO))) {
         # There was an error, check that data is available for all genotypes
+        showNotification("There was an error, check that data is available for all genotypes",
+                         type = "error")
         return ()
       }
+      GO <- GO[ rownames(GO) %in% unique(ids)  ,  colnames(GO) %in% unique(ids) ]
       
       ids <- factor(ids, levels = rownames(GO))
       Z <- as.matrix(model.matrix(~ids - 1))
@@ -276,10 +290,11 @@ prep_data_for_cv <- function(y_data, folds, cv1, cv2, cv0, cv00) {
   trait_col <- y_data$trait_col
   
   # Auto-assign as true since these are precursors for CV0 and CV00
-  if (cv0) { cv2 <- TRUE }
-  if (cv00) { cv1 <- TRUE }
+  #if (cv0) { cv2 <- TRUE }
+  if (cv00) { cv1 <- TRUE; cv0<-TRUE }
   
   gids <- unique(data[, gid])
+  eids<-unique(data[,eid])
   col_folds <- ncol(data)
   
   # Replace NA values with 0 for now
@@ -321,27 +336,32 @@ prep_data_for_cv <- function(y_data, folds, cv1, cv2, cv0, cv00) {
   }
   
   if (cv0) {
-    y_cv0 <- matrix(data[, trait_col], nrow=nrow(data), ncol=folds)
-    colnames(y_cv0) <- paste0(colnames(data)[trait_col], "_cv0_fold_", 1:folds)
-    
-    for (f in 1:folds) {
+    y_cv0 <- NA
+    fold <- rep(1:folds, each=ceiling(length(eids)/folds))[order(runif(length(eids)))]
+    for (f in 1:length(unique(fold))) {
       # Find the index for all rows with the same fold value
-      fold_idx <- which(y_cv2 == f)
+      fold_envs <- eids[fold == f]
       # Replace y_cv0 values with NA for these indexes
-      y_cv0[,f][fold_idx] <- NA
+      
+      y_cv0[data[[eid]] %in% fold_envs] <- f
+      
     }
-    retdf <- cbind(retdf, y_cv0)
+    retdf$cv0 <- y_cv0
   }
   
   if (cv00) {
-    y_cv00 <- matrix(data[,trait_col], nrow=nrow(data), ncol=folds)
+    #y_cv00 <- matrix(data[,trait_col], nrow=nrow(data), ncol=folds)
+    y_cv00<-matrix(NA,nrow=dim(data),ncol=folds)
     colnames(y_cv00) <- paste0(colnames(data)[trait_col],"_cv00_fold_",1:folds)
-    
+    y_cv00[,] <- data[,trait_col]
     for (f in 1:folds) {
       # Find the index for all rows with the same fold value
-      fold_idx <- which(y_cv1 == f)
+      #fold_idx <- which(y_cv1 == f)
       # Replace y_cv0 values with NA for these indexes
-      y_cv00[,f][fold_idx] <- NA
+      #y_cv00[fold_idx,f]<- NA
+      y_cv00[retdf$cv1==f & retdf$cv0==f,f] <- NA
+      y_cv00[retdf$cv1==f,f] <- NA
+      y_cv00[retdf$cv0==f,f] <- NA
     }
     retdf <- cbind(retdf, y_cv00)
   }
@@ -352,7 +372,7 @@ prep_data_for_cv <- function(y_data, folds, cv1, cv2, cv0, cv00) {
 
 # Get predictions based on CV methods
 get_predictions <- function(data, tmpdir, model_selected, model_eq, cv, folds, 
-                            nIter=5000, burnIn=500, esc=FALSE, model="RKHS") {
+                            nIter=NULL, burnIn=NULL, esc=FALSE, model="RKHS") {
   
   # Create output directory
   outdir <- file.path(tmpdir, "output", model_selected)
@@ -389,15 +409,16 @@ get_predictions <- function(data, tmpdir, model_selected, model_eq, cv, folds,
   }
   
   if(!is.null(cv)) {
-    cv <- tolower(cv)
+    #cv <- tolower(cv)
     
-    if (cv %in% c("cv1","cv2")) {
-      cv_data <- data[, match(cv, colnames(data))]
-    } else {
+    if (cv %in% c("cv00")) {
       cv_data <- data[, grep(paste0(cv,"_"), colnames(data))]
+    } else {
+      cv_data <- data[, match(cv, colnames(data))]
     }
     
     # Get predictions
+
     predictions <- fit_cv(cv, cv_data, data, folds, predictions, eta, nIter, burnIn)
     
     write.csv(predictions, file=file.path(outdir, paste0(cv, ".csv")), row.names = FALSE)
@@ -423,18 +444,36 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
   y <- data[, 3]            # Observed values
   eid <- data[, 2]          # Environment IDs
   gid <- data[, 1]          # Line IDs
-  
-  if (cv %in% c("cv0","cv00")) {
+  eids<- unique(eid)
+  if (cv %in% c("cv00")) {
     
     for (fold in seq_along(cv_data)) {
       # Train data
       y_na <- cv_data[, fold]
       # Test data index
       testing <- which(is.na(y_na))
+      # Fit BGLR model with training data
+      fm <- BGLR(y=y_na, ETA=eta, nIter=nIter, burnIn=burnIn, verbose=FALSE)
       
-      if(cv == "cv0") {
-        testing <- intersect(testing, which(gid %in% gid[testing]))
-      }
+      # Predict with the fitted model
+      preds <- data.frame(testing = testing, fold = fold, env = eid[testing],
+                          individual = gid[testing], observed = y[testing],
+                          predicted = round(fm$yHat[testing],3))
+      
+      predictions <- rbind(predictions, preds)
+    }
+  }
+  
+  if (cv %in% c("cv0")) {
+    
+    for (fold in 1:length(unique(rep(1:folds, each=ceiling(length(eids)/folds))[order(runif(length(eids)))]))) {
+      y_na <- y
+      
+      if (fold != -999) {
+        # Get idx for testing
+        testing <- which(cv_data == fold)
+        # Set testing data for fold to NA
+        y_na[testing] <- NA
       
       # Fit BGLR model with training data
       fm <- BGLR(y=y_na, ETA=eta, nIter=nIter, burnIn=burnIn, verbose=FALSE)
@@ -446,6 +485,7 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
       
       predictions <- rbind(predictions, preds)
     }
+  }
   }
   
   if (cv %in% c("cv1","cv2")) {
@@ -463,10 +503,10 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
         fm <- BGLR(y=y_na, ETA = eta, nIter=nIter, burnIn=burnIn, verbose=TRUE)
         
         # Generate predictions
+        
         preds <- data.frame(testing = testing, fold = fold, env = eid[testing],
                             individual = gid[testing], observed = y[testing],
                             predicted = round(fm$yHat[testing],3))
-        
         # Add predictions to dataset
         predictions <- rbind(predictions, preds)
       }

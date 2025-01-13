@@ -1,7 +1,7 @@
 # CHiDO is a no-code platform to integrate multi-omics data to build, train and test
 # linear mixed models for identifying candidates for desired GxE interactions.
 #
-# Copyright (C) 2024 Francisco Gonzalez, Diego Jarquin, and Julian Garcia
+# Copyright (C) 2025 Francisco Gonzalez, Diego Jarquin, and Julian Garcia, Vitor Sagae
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -18,7 +18,7 @@
 
 # Created by: Francisco Gonzalez
 # Last Updated By: Francisco Gonzalez
-# Last Updated: 06/10/2024
+# Last Updated: 01/10/2025
 
 library(shiny)
 library(shinydashboard)
@@ -51,7 +51,10 @@ data_view_instructions <- "To view the data you have uploaded for this session,
 ### Supporting objects ----
 
 # Dropdown items for data type selection
-omic_types <- c("genomic markers", "phenomic markers", "environmental markers",
+omic_types_gen <- c("genomic markers", "phenomic markers", "environmental markers",
+                "pedigree data", "high-throughput data", "other")
+
+omic_types_cga <- c("genomic markers", "phenomic markers", "environmental markers",
                 "pedigree data", "high-throughput data", "other")
 
 # Upload phenotypic response file box
@@ -59,10 +62,9 @@ upload_y_box <- box(
   width = 6,
   class = "upload-box",
   fileInput("y_file", "Upload phenotype response (Y) file:", multiple=FALSE),
-  create_input_box('*Genotype ID column:', "gid_col", 1),
-  create_input_box("*Environment ID column:", "eid_col", 2),
-  create_input_box("Individual ID (UID) column:", "uid_col"),
-  create_input_box("*Target trait column:", "trait_col", 3),
+  tags$div(style="position: relative; top: -20px;",
+  radioButtons(inputId="modtype",label="Select model type:",choices=c("Genotype level", "Combining ability"),selected="Genotype level",inline=T)),
+  uiOutput("y_panel"),
   tags$hr(class="separator"),
   # Upload button
   div(class="action-btn", div(class="btn-contents",
@@ -74,10 +76,11 @@ upload_y_box <- box(
 upload_omics_box <- box(
   width = 6, 
   class = "upload-box",
-  selectInput("data_type", "Select data type:", omic_types, selected="genomic markers"),
+  selectInput("data_type", "Select data type:", omic_types_gen, selected="genomic markers"),
   fileInput("file","Choose file to upload:", multiple=FALSE),
   tags$hr(style="margin-top: -20px;"),
   uiOutput("data_panel"),
+  checkboxInput("check_data","Check data consistency",value = F),
   tags$hr(class="separator"),
   div(class="action-btn", div(class="btn-contents",
                               actionButton("upload", "Upload"))

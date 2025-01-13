@@ -19,6 +19,7 @@ There is a demo version of CHiDO hosted as a free web application at:
 -   Francisco González - University of Florida (UF)
 -   Julián García - Universidad Politécnica de Madrid (UPM)
 -   Dr. Diego Jarquin - University of Florida (UF)
+-   Vitor Sagae - University of Florida (UF) and Federal University of Viçosa (UFV)
 
 ## Installation
 

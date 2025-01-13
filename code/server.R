@@ -1,7 +1,7 @@
 # CHiDO is a no-code platform to integrate multi-omics data to build, train and test
 # linear mixed models for identifying candidates for desired GxE interactions.
 #
-# Copyright (C) 2024 Francisco Gonzalez, Diego Jarquin, and Julian Garcia
+# Copyright (C) 2025 Francisco Gonzalez, Diego Jarquin, and Julian Garcia, Vitor Sagae
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -17,8 +17,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # Created by: Francisco Gonzalez
-# Last updated by: Francisco Gonzalez
-# Last updated: 06/10/2024
+# Last updated by: Francisco Gonzalez, Julian Garcia, Vitor Sagae
+# Last updated: 01/10/2025
 
 ### Libraries ----
 
@@ -47,7 +47,7 @@ server <- function(input, output, session) {
   
   ### Global ----
   
-  # Set maximm file size to 50MB
+  # Set maximm file size to 50MB 
   options(shiny.maxRequestSize = 50 * 1024 ^ 2)
   
   # Create temporary directory for session files
@@ -70,39 +70,93 @@ server <- function(input, output, session) {
     Linkage = character(),
     stringsAsFactors = FALSE
   ))
-
+  
   ### Data tab ----
+  
+  # Generate a dynamic upload panel based on model type selected
+  output$y_panel<-renderUI({
+    if (input$modtype%in%"Genotype level"){
+      panel<-div(create_input_box('*Genotype ID column:', "gid_col", 1),
+                 create_input_box("*Environment ID column:", "eid_col", 2),
+                 create_input_box("Individual ID (UID) column:", "uid_col"),
+                 create_input_box("*Target trait column:", "trait_col", 3))
+    }else{
+      
+      panel<-div(create_input_box('*Genotype ID column:', "gid_col", 1),
+                 create_input_box('*Parent Group 1 ID column:', "g1id_col", 2),
+                 create_input_box('*Parent Group 2 ID column:', "g2id_col", 3),
+                 create_input_box("*Environment ID column:", "eid_col", 4),
+                 create_input_box("Individual ID (UID) column:", "uid_col"),
+                 create_input_box("*Target trait column:", "trait_col", 5))
+    }
+  })
   
   # Generate a dynamic upload panel based on omic type selected
   output$data_panel <- renderUI({
-    if (input$data_type %in% c("high-throughput data", "other")) {
-      panel <- create_panel(input$data_type, input$label)
-    } 
-    else {
-      
-      label_id <- ifelse(input$data_type == "environmental markers",
-                         "*Environment ID",
-                         "*Genotype / Line ID")
-      
-      panel <- div(
-        # Label
-        div(
-          style = "display: flex; align-items: center; margin-top: -27px; padding: 4px;",
-          tags$label('*Reference label:', style = "width:200px;"),
-          div(style = "margin-left: auto; min-width: 60px; max-width: 70px;",
-              textInput("label", "", ""))
-        ),
-        # Genome or Env ID
-        div(
-          style = "display: flex; align-items: center; margin-top: -27px; padding: 4px;",
-          tags$label(label_id, style = "width: 200px;"),
+    if (input$modtype=="Genotype level"){
+      if (input$data_type %in% c("high-throughput data", "other")) {
+        panel <- create_panel(input$data_type, input$label)
+      } 
+      else {
+        
+        label_id <- ifelse(input$data_type == "environmental markers",
+                           "*Environment ID",
+                           "*Genotype / Line ID")
+        
+        panel <- div(
+          # Label
           div(
-            style = "margin-left: auto; min-width: 60px; max-width: 100px;",
-            numericInput("id_col", "", value = 1, min = 1, max = 999)
+            style = "display: flex; align-items: center; margin-top: -27px; padding: 4px;",
+            tags$label('*Reference label:', style = "width:200px;"),
+            div(style = "margin-left: auto; min-width: 60px; max-width: 70px;",
+                textInput("label", "", ""))
+          ),
+          # Genome or Env ID
+          div(
+            style = "display: flex; align-items: center; margin-top: -27px; padding: 4px;",
+            tags$label(label_id, style = "width: 200px;"),
+            div(
+              style = "margin-left: auto; min-width: 60px; max-width: 100px;",
+              numericInput("id_col", "", value = 1, min = 1, max = 999)
+            )
           )
         )
-      )
+      }
     }
+    else{
+      #if (input$data_type %in% c("high-throughput data", "other")) {
+      id_col <- tolower(input$label)
+      
+      panel <- conditionalPanel(
+        condition = paste0("input.data_type == '", input$data_type, "'"),
+        # Label
+        div(style="display: flex; align-items: center; margin-top: -20px; padding: 2px;", 
+            tags$label("Reference Label:", style="width:200px;"),
+            div(style="margin-left: auto; min-width: 60px; max-width: 70px;",
+                textInput("label", "", input$label))
+        ),
+        # ID
+        div(style="display: flex; align-items: center; margin-top: -20px; padding: 2px;", 
+            tags$label("Linkage column (relation to Y):", style="width: 200px;"),
+            div(style="margin-left: auto; min-width: 60px; max-width: 100px;", 
+                numericInput("id_col", "", value = 1, min = 1, max = 999))
+        ),
+        selectInput("linkage_type", "Linkage type", 
+                    c("Environment ID", "Parent Group 1 ID", "Parent Group 2 ID","Parent Groups ID", "Compound ID / UID")
+        )
+      )
+      #} 
+    }
+  })
+  
+  # Switch omic options according to model type
+  observeEvent(input$modtype,{
+    omic<-if (input$modtype=="Genotype level"){
+      omic_types_gen
+    }else{
+      omic_types_cga
+    }
+    updateSelectInput(session,"data_type",choices=omic)
   })
   
   # Switch panel defaults based on data type
@@ -133,16 +187,22 @@ server <- function(input, output, session) {
   # Loading Y file after upload button is pressed
   observeEvent(input$y_load, {
     # Create omic metadata object
-    config <- create_omic_config(input$y_file, "Y", "phenotypic", input$trait_col, 
-                                 gid_col = input$gid_col, eid_col = input$eid_col,
-                                 uid_col = input$uid_col)
+    if(input$modtype=="Genotype level"){
+      config <- create_omic_config(input$y_file, "Y", "phenotypic",input$modtype, input$trait_col, 
+                                   gid_col = input$gid_col, eid_col = input$eid_col,
+                                   uid_col = input$uid_col)
+    }else{
+      config <- create_omic_config(input$y_file, "Y", "phenotypic",input$modtype, input$trait_col, 
+                                   gid_col = input$gid_col,g1id_col = input$g1id_col, g2id_col = input$g2id_col, eid_col = input$eid_col,
+                                   uid_col = input$uid_col)
+    }
     
     if(is.null(config)) {
       showNotification("No file was uploaded, try again.", type="error")
       return()
     }
     
-    verified <- verify_omic_object(config, phen = TRUE)
+    verified <- verify_omic_object(config, phen = TRUE,modtype=input$modtype)
     
     if(verified) {
       
@@ -153,36 +213,87 @@ server <- function(input, output, session) {
       phen_data(config)
       curr_data <- data_sources()
       
-      for (omic in c("E","L")) {
-        
-        if(omic == "E") {
-          data_type = "Environment IDs"
-          link = "Environment ID"
-          id_col = input$eid_col
-        } else {
-          data_type = "Line IDs"
-          link = "Genotype / Line ID"
-          id_col = input$gid_col
-        }
-        
-        # Get config for ID column
-        curr_omic <- create_omic_config(input$y_file, omic, data_type, id_col,
-                                        link = link)
-        
-        # Load data as data.frame for that respective column
-        curr_omic$data <- config$data[, id_col, drop=FALSE]
-        
-        curr_data[[curr_omic$label]] <- curr_omic
-        
-        # Add omic to preview table
-        curr_table <- table_data()
-        updated_table <- update_table(curr_table, curr_data[[curr_omic$label]])
-        table_data(updated_table)
-      }
+      if (input$modtype=="Genotype level"){
+        for (omic in c("E","L")) {
+          
+          if(omic == "E") {
+            data_type = "Environment IDs"
+            link = "Environment ID"
+            id_col = input$eid_col
+            uid_col=input$uid_col
+          } else {
+            data_type = "Line IDs"
+            link = "Genotype / Line ID"
+            id_col = input$gid_col
+            uid_col=input$uid_col
+          }
+          
+          # Get config for ID column
+          curr_omic <- create_omic_config(input$y_file, omic, data_type,input$modtype,id_col,
+                                          link = link, uid_col=uid_col)
+          # Load data as data.frame for that respective column
+          curr_omic$data <- config$data[, id_col, drop=FALSE]
+          
+          if(!is.na(input$uid_col)){
+          curr_omic$uid<- config$data[, uid_col,drop=FALSE]
+          }
+          
+          curr_data[[curr_omic$label]] <- curr_omic
+          
+          # Add omic to preview table
+          curr_table <- table_data()
+          updated_table <- update_table(curr_table, curr_data[[curr_omic$label]])
+          table_data(updated_table)
+        }}else{
+          for (omic in c("E","L","L1","L2")) {
+            
+            if(omic == "E") {
+              data_type = "Environment IDs"
+              link = "Environment ID"
+              id_col = input$eid_col
+              uid_col=input$uid_col
+            } 
+            if(omic == "L") {
+              data_type = "Line IDs"
+              link = "Genotype / Line ID"
+              id_col = input$gid_col
+              uid_col=input$uid_col
+            } 
+            if (omic == "L1"){
+              data_type = "Line Group 1 IDs"
+              link = "Parent Group 1 ID"
+              id_col = input$g1id_col
+              uid_col=input$uid_col
+            } 
+            if (omic == "L2") {
+              data_type = "Line Group 2 IDs"
+              link = "Parent Group 2 ID"
+              id_col = input$g2id_col
+              uid_col=input$uid_col
+            }
+            
+            
+            # Get config for ID column
+            curr_omic <- create_omic_config(input$y_file, omic, data_type,input$modtype,id_col,
+                                            link = link, uid_col=uid_col)
+            
+            # Load data as data.frame for that respective column
+            curr_omic$data <- config$data[, id_col, drop=FALSE]
+            
+            if(!is.na(uid_col)){
+              curr_omic$uid<- config$data[, uid_col,drop=FALSE]
+            }
+            
+            curr_data[[curr_omic$label]] <- curr_omic
+            
+            # Add omic to preview table
+            curr_table <- table_data()
+            updated_table <- update_table(curr_table, curr_data[[curr_omic$label]])
+            table_data(updated_table)
+          }}
       
       # Save data added for E and L
       data_sources(curr_data)
-      
       # Update avalable omics in model assembly page
       updateSelectInput(session, "omics_labels", choices = names(data_sources()))
       showNotification("Data was successfully uploaded!", type="message")
@@ -193,58 +304,272 @@ server <- function(input, output, session) {
     }
   })
   
+  
   # Add omics data to session
   observeEvent(input$upload, {
-    
-    # Create omic metadata object
-    config <- create_omic_config(input$file, input$label, input$data_type, 
-                                 input$id_col, link = input$linkage_type)
-    
-    if(is.null(config)) {
-      showNotification("No file was uploaded, try again.", type="error")
-      return()
+    if (input$modtype=="Genotype level"){
+      
+      # Create omic metadata object
+      config <- create_omic_config(input$file, input$label, input$data_type,input$modtype, 
+                                   input$id_col, link = input$linkage_type)
+      
+      if(is.null(config)) {
+        showNotification("No file was uploaded, try again.", type="error")
+        return()
+      }
+      
+      if(input$check_data & is.null(input$y_file)){
+        #showNotification("To check data consistency you need to upload phenotype response file (Y).", type="error")
+        return()
+      }
+      
+      verified <- verify_omic_object(config)
+      
+      if(verified) {
+        
+        # Add data to metadata config 
+        config$data <- load_data(input$file$datapath)
+        
+        # Grab values from reactive objects
+        curr_data <- data_sources()
+        curr_types <- data_types()
+        curr_table <- table_data()
+        
+        # New omic type, register and increment file counter
+        if (!config$type %in% curr_types) {
+          file_counter(file_counter() + 1)
+          data_types(c(curr_types, config$type))
+        }
+        
+        # Check if the label already exists and remove the corresponding row
+        existing_label_idx <- which(curr_table$Label == config$label)
+        if (length(existing_label_idx) > 0) {
+          curr_table <- curr_table[-existing_label_idx, ]
+        }
+        
+        # Add omic with data to available data sources
+        curr_data[[config$label]] <- config
+        data_sources(curr_data)
+        
+        # Add omic to preview table
+        updated_table <- update_table(curr_table, curr_data[[config$label]])
+        table_data(updated_table)
+        
+        # Update avalable omics in model assembly page
+        updateSelectInput(session, "omics_labels", choices = names(data_sources()))
+        showNotification("Data was successfully uploaded!", type="message")
+        
+      } else {
+        showNotification("Error: check the data entered in the upload box.", type="error")
+        return()
+      }
+    }else{
+      if (!input$linkage_type=="Parent Groups ID"){
+        # Create omic metadata object
+        config <- create_omic_config(input$file, input$label, input$data_type,input$modtype, 
+                                     input$id_col, link = input$linkage_type)
+        if(is.null(config)) {
+          showNotification("No file was uploaded, try again.", type="error")
+          return()
+        }
+        
+        if(input$check_data & is.null(input$y_file)){
+          #showNotification("To check data consistency you need to upload phenotype response file (Y).", type="error")
+          return()
+        }
+        
+        verified <- verify_omic_object(config)
+        
+        if(verified) {
+          
+          # Add data to metadata config 
+          config$data <- load_data(input$file$datapath)
+          
+          # Grab values from reactive objects
+          curr_data <- data_sources()
+          curr_types <- data_types()
+          curr_table <- table_data()
+          
+          # New omic type, register and increment file counter
+          if (!config$type %in% curr_types) {
+            file_counter(file_counter() + 1)
+            data_types(c(curr_types, config$type))
+          }
+          
+          # Check if the label already exists and remove the corresponding row
+          existing_label_idx <- which(curr_table$Label == config$label)
+          if (length(existing_label_idx) > 0) {
+            curr_table <- curr_table[-existing_label_idx, ]
+          }
+          
+          # Add omic with data to available data sources
+          curr_data[[config$label]] <- config
+          data_sources(curr_data)
+          
+          # Add omic to preview table
+          updated_table <- update_table(curr_table, curr_data[[config$label]])
+          table_data(updated_table)
+          
+          # Update avalable omics in model assembly page
+          updateSelectInput(session, "omics_labels", choices = names(data_sources()))
+          showNotification("Data was successfully uploaded!", type="message")
+          
+        } else {
+          showNotification("Error: check the data entered in the upload box.", type="error")
+          return()
+        }
+      }
     }
+  })
+  
+  # Duplicate omic in case of combining ability model with one genomic marker information for both groups
+  observeEvent(input$upload, {
+    if(!input$modtype=="Genotype level"){
+      if (input$linkage_type=="Parent Groups ID"){
+        for(omic in c(paste(input$label,"1",sep=""),paste(input$label,"2",sep=""))){
+          if (omic == paste(input$label,"1",sep="")) {
+            data_type = "genomic markers"
+            link = "Parent Group 1 ID"
+            id_col = input$id_col
+          }
+          if (omic == paste(input$label,"2",sep="")) {
+            data_type = "genomic markers"
+            link = "Parent Group 2 ID"
+            id_col = input$id_col
+          }
+          # Create omic metadata object
+          
+          config <- create_omic_config(input$file, omic, data_type,input$modtype, 
+                                       id_col, link=link)
+          
+          if(is.null(config)) {
+            showNotification("No file was uploaded, try again.", type="error")
+            return()
+          }
+          
+          if(input$check_data & is.null(input$y_file)){
+            #showNotification("To check data consistency you need to upload phenotype response file (Y).", type="error")
+            return()
+          }
+          
+          verified <- verify_omic_object(config)
+          if(verified) {
+            
+            # Add data to metadata config 
+            config$data <- load_data(input$file$datapath)
+            
+            # Grab values from reactive objects
+            curr_data <- data_sources()
+            curr_types <- data_types()
+            curr_table <- table_data()
+            
+            # New omic type, register and increment file counter
+            if (!config$type %in% curr_types) {
+              file_counter(file_counter() + 1)
+              data_types(c(curr_types, config$type))
+            }
+            
+            # Check if the label already exists and remove the corresponding row
+            existing_label_idx <- which(curr_table$Label == config$label)
+            if (length(existing_label_idx) > 0) {
+              curr_table <- curr_table[-existing_label_idx, ]
+            }
+            
+            # Add omic with data to available data sources
+            curr_data[[config$label]] <- config
+            data_sources(curr_data)
+            
+            # Add omic to preview table
+            updated_table <- update_table(curr_table, curr_data[[config$label]])
+            table_data(updated_table)
+            
+          }else {
+            showNotification("Error: check the data entered in the upload box.", type="error")
+            return()
+          }
+        }
+        
+        # Update avalable omics in model assembly page
+        updateSelectInput(session, "omics_labels", choices = names(data_sources()))
+        showNotification("Data was successfully uploaded!", type="message")
+      }
+    }
+  }
+  )
+  
+  # set function to check data consistency
+  observeEvent(input$upload, {
     
-    # Verify the metadata content
-    verified <- verify_omic_object(config)
-    
-    if(verified) {
-      
-      # Add data to metadata config 
-      config$data <- load_data(input$file$datapath)
-      
-      # Grab values from reactive objects
-      curr_data <- data_sources()
-      curr_types <- data_types()
-      curr_table <- table_data()
-      
-      # New omic type, register and increment file counter
-      if (!config$type %in% curr_types) {
-        file_counter(file_counter() + 1)
-        data_types(c(curr_types, config$type))
+    if(input$check_data){ # Only works when check box is TRUE
+      if(is.null(input$y_file)){
+        showNotification("To check data consistency you first need to upload phenotype response file (Y).", type="error")
+        return()
       }
       
-      # Check if the label already exists and remove the corresponding row
-      existing_label_idx <- which(curr_table$Label == config$label)
-      if (length(existing_label_idx) > 0) {
-        curr_table <- curr_table[-existing_label_idx, ]
+      if(input$data_type=="environmental markers"){ # Function to check consistency between environmental markers and environments
+        ids<-data_sources()[["E"]]$data[,1]
+        update_data_sources<-data_sources()
+        
+        update_data_sources[[input$label]]$data <- update_data_sources[[input$label]]$data[update_data_sources[[input$label]]$data[[input$id_col]] %in% ids, ]
+        
+        data_sources(update_data_sources)
+        if (is.na(update_data_sources[[input$label]]$data[1,1]) ){
+          showNotification("Please check omic ID column and/or linkage type.", type="error")
+        }else{
+          data_sources(update_data_sources)
+          showNotification("Data was successfully checked!", type="message")
+        }
+      }else{
+      if(input$modtype=="Genotype level"){ # Check at Genotype level
+        
+        # Function to check genotypes
+        update_data_sources<-data_sources()
+        
+        if(data_sources()[["L"]]$linkage_type=="Compound ID / UID"){
+        ids<-data_sources()[["L"]]$uid[,1]
+        }else{
+        ids<-data_sources()[["L"]]$data[,1]
+        }
+        
+        update_data_sources[[input$label]]$data <- update_data_sources[[input$label]]$data[update_data_sources[[input$label]]$data[[input$id_col]] %in% ids, ]
+        
+        if (is.na(update_data_sources[[input$label]]$data[1,1]) ){
+          showNotification("Please check omic ID column and/or linkage type.", type="error")
+        }else{
+          data_sources(update_data_sources)
+          showNotification("Data was successfully checked!", type="message")
+        }
+      }else{ # Check at parent level
+        
+        update_data_sources<-data_sources()
+        if(input$linkage_type=="Parent Group 1 ID"){
+          ids<-data_sources()[["L1"]]$data[,1]
+          update_data_sources[[input$label]]$data <- update_data_sources[[input$label]]$data[update_data_sources[[input$label]]$data[[input$id_col]] %in% ids, ]
+        }
+        else if(input$linkage_type=="Parent Group 2 ID"){
+          ids<-data_sources()[["L2"]]$data[,1]
+          update_data_sources[[input$label]]$data <- update_data_sources[[input$label]]$data[update_data_sources[[input$label]]$data[[input$id_col]] %in% ids, ]
+        }
+        
+        else if(input$linkage_type=="Parent Groups ID"){
+          ids<-c(data_sources()[["L1"]]$data[,1],data_sources()[["L2"]]$data[,1])
+          update_data_sources[[paste(input$label,"1",sep="")]]$data <- update_data_sources[[paste(input$label,"1",sep="")]]$data[update_data_sources[[paste(input$label,"1",sep="")]]$data[[input$id_col]] %in% ids, ]
+          update_data_sources[[paste(input$label,"2",sep="")]]$data <- update_data_sources[[paste(input$label,"2",sep="")]]$data[update_data_sources[[paste(input$label,"2",sep="")]]$data[[input$id_col]] %in% ids, ]
+          
+        }
+        else if(input$linkage_type=="Compound ID / UID"){
+          ids<-c(data_sources()[["L"]]$uid[,1],data_sources()[["L"]]$uid[,1])
+          update_data_sources[[input$label]]$data <- update_data_sources[[input$label]]$data[update_data_sources[[input$label]]$data[[input$id_col]] %in% ids, ]
+          
+        }
+        if (nrow(update_data_sources[[length(update_data_sources)]]$data)<=0 ){
+          showNotification("Please check omic ID column and/or linkage type.", type="error")
+        }else{
+          data_sources(update_data_sources)
+          showNotification("Data was successfully checked!", type="message")
+        }
       }
-      
-      # Add omic with data to available data sources
-      curr_data[[config$label]] <- config
-      data_sources(curr_data)
-      
-      # Add omic to preview table
-      updated_table <- update_table(curr_table, curr_data[[config$label]])
-      table_data(updated_table)
-      
-      # Update avalable omics in model assembly page
-      updateSelectInput(session, "omics_labels", choices = names(data_sources()))
-      showNotification("Data was successfully uploaded!", type="message")
-      
-    } else {
-      showNotification("Error: check the data entered in the upload box.", type="error")
-      return()
+      }
     }
   })
   
@@ -264,7 +589,7 @@ server <- function(input, output, session) {
   observeEvent(input$delete_rows, {
     select_rows <- input$omics_table_rows_selected
     
-    if(length(select_rows > 0)) {
+    if(length(select_rows) > 0) {
       # Create new table object without these rows
       curr_table <- table_data()[-select_rows,]
       # Delete the associated omics
@@ -273,6 +598,7 @@ server <- function(input, output, session) {
       curr_data <- curr_data[!(names(curr_data) %in% del_omics)]
       # Update table
       table_data(curr_table)
+      data_sources(curr_data)
     }
   })
   
@@ -491,9 +817,9 @@ server <- function(input, output, session) {
     ds <- data_sources()
     # Separate Y data from the rest
     ydata <- phen_data()
-    
     # Get unique list of labels
     labels <- unique(unlist(model_equation))
+    
     
     ### 2/6 -- Creating matrices ###
     logging(session, "Step [2/6] Creating G matrices.")
@@ -503,13 +829,11 @@ server <- function(input, output, session) {
       # Get the ID column shared by omic and Y data
       curr_term <- ds[[label]]
       curr_term$y_col <- get_join_id(curr_term, ydata[!names(ydata) %in% "data"])
-      
       if (is.null(curr_term$y_col)) {
         showNotification("There is a linkage error between your data, please check your ID columns",
                          type = "error")
         return()
       }
-      
       # Create incidence matrix using share ID by Y and term
       logging(session, paste0("1 ==> Preparing Z matrix for: ", label))
       
@@ -518,11 +842,12 @@ server <- function(input, output, session) {
       
       # Create G matrices 
       logging(session, paste0("3 ==> Creating G matrix for: ", label))
-      result <- create_g_matrix(curr_term, ydata, wht, ctr, std, nan_freq, prop_maf_j=NULL)
       
+      result <- create_g_matrix(curr_term, ydata, wht, ctr, std, nan_freq, prop_maf_j)
       G <- result[["G"]]
       EVD <- result[["EVD"]]
-      
+      print(dim(G))
+      print(dim(EVD$vectors))
       # Save the results as RDA files
       logging(session, paste0("4 ==> Saving results for: ", label))
       
@@ -568,18 +893,25 @@ server <- function(input, output, session) {
     ### 4/6 -- Preparing data for cross-validation ###
     logging(session, "Step [4/6] Assigning folds for cross validation")
     cv_ids <- prep_data_for_cv(ydata, folds, cv1, cv2, cv0, cv00)
-    
+    #write.csv(cv_ids,file="cv_ids.csv",row.names=F)
     # Get terms to add as column names
     all_terms <- sapply(model_equation, function(x) paste(x, collapse="_"))
     
     ### 5/6 -- Performing cross-validations ###
     logging(session, "Step [5/6] Performing cross-validations")
     
+    #####################
+    
     set.seed(seed)
     
     outdir <- file.path(tmpdir, model_selected)
     if (!dir.exists(outdir)) { dir.create(outdir, recursive = TRUE) }
     
+    if (cv00) { 
+      logging(session, "CV00")
+      cv1_preds <- get_predictions(cv_ids, tmpdir, model_selected, all_terms, "cv00", 
+                                   folds, nIter=nIter, burnIn=burnIn)
+    }
     if (cv1) { 
       logging(session, "CV1")
       cv1_preds <- get_predictions(cv_ids, tmpdir, model_selected, all_terms, "cv1", 
@@ -593,11 +925,6 @@ server <- function(input, output, session) {
     if (cv0) { 
       logging(session, "CV0")
       cv1_preds <- get_predictions(cv_ids, tmpdir, model_selected, all_terms, "cv0", 
-                                   folds, nIter=nIter, burnIn=burnIn)
-    }
-    if (cv00) { 
-      logging(session, "CV00")
-      cv1_preds <- get_predictions(cv_ids, tmpdir, model_selected, all_terms, "cv00", 
                                    folds, nIter=nIter, burnIn=burnIn)
     }
     
@@ -626,7 +953,7 @@ server <- function(input, output, session) {
     showModal(
       modalDialog(title = "Notification",
                   "Cross-validation(s) completed! Please go to the 'Results' tab to view outcome",
-                  easyClose = FALSE,
+                  easyClose = TRUE,
                   footer = tagList(actionButton("go_to_results", "View Results")))
     )
   })
@@ -653,7 +980,7 @@ server <- function(input, output, session) {
     },
     valueFunc = function() {
       list.files(file.path(tmpdir, "output"), pattern = "\\.csv$", recursive = TRUE)
-  })
+    })
   
   # Generate dynamic UI for file menu
   output$results_menu <- renderUI({

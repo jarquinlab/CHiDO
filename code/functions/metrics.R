@@ -1,7 +1,7 @@
 # CHiDO is a no-code platform to integrate multi-omics data to build, train and test
 # linear mixed models for identifying candidates for desired GxE interactions.
 #
-# Copyright (C) 2024 Francisco Gonzalez, Diego Jarquin, and Julian Garcia
+# Copyright (C) 2025 Francisco Gonzalez, Diego Jarquin, and Julian Garcia, Vitor Sagae
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -17,8 +17,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # Created by: Julian Garcia
-# Last updated by: Francisco Gonzalez
-# Last updated: 06/10/2024
+# Last updated by: Francisco Gonzalez, Julian Garcia  
+# Last updated: 01/10/2025
 
 # This code iteratively gathers all the information in files of the form 'output/[model-name]/[cv].csv'
 library(dplyr)
@@ -117,7 +117,8 @@ get_model_accuracy <- function(eid_col, modeldir, group_by_env=FALSE) {
       scale_color_manual(values = c("transparent", "black")) +
       labs(x="Environment", y="Correlation", fill="Model") +
       theme(axis.text.x = element_text(size = 8, angle=40, hjust = 1)) +
-      labs(x="Environment ID", y="Prediction Accuracy (out of 1)", fill="Model")
+      labs(x="Environment ID", y="Prediction Accuracy (out of 1)", fill="Model")+
+      guides(alpha = "none", color = "none")
     
     plot_name <- "accuracy_by_env"
     
