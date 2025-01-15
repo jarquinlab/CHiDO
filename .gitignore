@@ -4,6 +4,6 @@
 .Ruserdata
 .DS_Store
 manifest.json
-
 docs/
 rsconnect/
+README.html
