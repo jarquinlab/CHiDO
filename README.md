@@ -87,9 +87,9 @@ When you upload an omic file, you must specify a label (e.g., G for genomics) an
 column where the IDs are located. If you select "other" as the data type or using the combining ability model, a dropdown
 menu will be displayed where you can select how the ID column should be linked back to the first file.
 
-The __combining ability__ model is intended for hybrid modeling. In this case, users can upload omics data specifically for each group. 
-For example, the genomic marker matrices where available genotypic information corresponds to the parents of phenotyped individuals can be uploaded for each of the parental groups __(Parent Group 1 ID and Parent Group 2 ID)__, or for both groups using a single genomic marker matrix containing males and females __(Parents Groups ID)__.
-IDs should corresponds to the chosen option.
+The __combining ability__ model is intended for hybrid modeling. In this case, users can upload omics data specifically for each parental group. 
+For example, the genomic marker matrices where available genotypic information corresponds to the parents of phenotyped individuals can be uploaded for each of the parental groups __(Parent Group 1 ID and Parent Group 2 ID)__, or for both groups using a single genomic marker matrix containing males and females genotypes __(Parents Groups ID)__.
+IDs should corresponds to the chosen option in a single linkage column.
 
 
 - __Check data consistency__ function will remove those rows whose ID in the omic data are absent in the phenotypic file following the linkage columns.
