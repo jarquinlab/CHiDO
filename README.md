@@ -90,7 +90,7 @@ menu will be displayed where you can select how the ID column should be linked b
 For __combining ability__ model: users can upload omics data specifically for each group __(Parent Group 1 ID or Parent Group 2 ID)__, or for both groups __(Parents Groups ID)__. IDs should corresponds to the chosen option.
 
 
-- __Check data consistency__ function will remove those rows whose ID in the omic data are absent in the phenotypic file.
+- __Check data consistency__ function will remove those rows whose ID in the omic data are absent in the phenotypic file following the linkage columns.
 
 
 
