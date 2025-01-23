@@ -59,10 +59,15 @@ header <- dashboardHeader(
   title = div(tags$img(src="logo_jarquin_uf.png", class="logo-image"), "CHiDO")
 )
 
-ui <- dashboardPage(
-  title = "CHiDO",
-  skin = "black",
-  header,
-  sidebar,
-  body
+ui <- fluidPage(
+  tags$head(tags$link(rel = "icon", type = "image/png", href = "favicon-32x32.png")),
+  dashboardPage(
+    title = "CHiDO",
+    skin = "black",
+    header,
+    sidebar,
+    body
+  )
 )
+
+
