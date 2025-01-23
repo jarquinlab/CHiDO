@@ -18,8 +18,8 @@ There is a demo version of CHiDO hosted as a free web application at:
 
 -   Francisco González - University of Florida (UF)
 -   Julián García - Universidad Politécnica de Madrid (UPM)
--   Dr. Diego Jarquin - University of Florida (UF)
 -   Vitor Sagae - University of Florida (UF) and Federal University of Viçosa (UFV)
+-   Dr. Diego Jarquin - University of Florida (UF)
 
 ## Installation
 
@@ -63,22 +63,43 @@ Data format supported: CSV
 
 Data size limits: 50MB
 
-At minimum, users must upload a file with the following columns:
+#### Model choice
+
+CHiDO can fit a __genotype__ and/or a __parent__ level model (combining ability). 
+
+For __genotype level__ model at minimum, users must upload a file with the following columns:
 - __Genotype ID:__ Identify the genotypic lines that were examined in the field trials, this can be a numeric or non-numeric identifier.
 - __Environment ID:__ Identify the environmental unit (e.g. plot) through which the field trials were split, this can be a numeric or non-numeric identifier.
 - __Target trait:__ The phenotypic trait to predict. There can be multiple columns for each phenotypic trait but only one can be defined as the target trait per run.
 
-#### Other data files
+For __parent level__ model at minimum, users must upload a file with the following columns:
+- __Genotype ID:__ Identify the genotypic lines that were examined in the field trials, this can be a numeric or non-numeric identifier.
+- __Parent Group 1 ID:__ Identify the first group of parents, this can be a numeric or non-numeric identifier.
+- __Parent Group 2 ID:__ Identify the second group of parents, this can be a numeric or non-numeric identifier.
+- __Environment ID:__ Identify the environmental unit (e.g. plot) through which the field trials were split, this can be a numeric or non-numeric identifier.
+- __Target trait:__ The phenotypic trait to predict. There can be multiple columns for each phenotypic trait but only one can be defined as the target trait per run.
 
-Additional datasets, or "omics", can be uploaded on the right-hand box of the _Data Upload_ page (image below). These files should have at least one ID column that can be linked back to the file containing the IDs and phenotypic data.
+#### Omics data files
 
-
-<img src="images/1_data_upload.png" alt="images/1_data_upload.png" width="800"/>
-
+Additional datasets, or "omics", can be uploaded on the right-hand box of the _Data Upload_ page (image below). These files should have at least one ID column that can be linked back to the file containing the IDs and phenotypic data. 
 
 When you upload an omic file, you must specify a label (e.g., G for genomics) and the
-column where the IDs are located. If you select "other" as the data type, a dropdown
+column where the IDs are located. If you select "other" as the data type or using the combining ability model, a dropdown
 menu will be displayed where you can select how the ID column should be linked back to the first file.
+
+The __combining ability__ model is intended for hybrid modeling. In this case, users can upload omics data specifically for each parental group. 
+For example, the genomic marker matrices where available genotypic information corresponds to the parents of phenotyped individuals, can be uploaded for each of the parental groups __(Parent Group 1 ID and Parent Group 2 ID)__, or for both groups using an unique genomic marker matrix containing males and females genotypes __(Parents Groups ID)__.
+IDs should corresponds to the chosen option in a single linkage column.
+
+
+- __Check data consistency__ function will remove those rows whose ID in the omic data are absent in the phenotypic file following the linkage columns.
+
+
+
+<img src="images/1_data_upload.png" alt="images/1_data_upload.png" width="800"/> <img src="images/1_data_upload_ca.png" alt="images/1_data_upload_ca.png" width="800"/>
+
+
+
 
 ### 2/ Model assembly
 
