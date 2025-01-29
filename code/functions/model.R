@@ -337,7 +337,8 @@ prep_data_for_cv <- function(y_data, folds, cv1, cv2, cv0, cv00) {
   
   if (cv0) {
     y_cv0 <- NA
-    fold <- rep(1:folds, each=ceiling(length(eids)/folds))[order(runif(length(eids)))]
+    fold <- rep(1:folds, times=ceiling(length(eids)/folds))[order(runif(length(eids)))]
+
     for (f in 1:length(unique(fold))) {
       # Find the index for all rows with the same fold value
       fold_envs <- eids[fold == f]
@@ -350,22 +351,28 @@ prep_data_for_cv <- function(y_data, folds, cv1, cv2, cv0, cv00) {
   }
   
   if (cv00) {
-    #y_cv00 <- matrix(data[,trait_col], nrow=nrow(data), ncol=folds)
     y_cv00<-matrix(NA,nrow=dim(data),ncol=folds)
-    colnames(y_cv00) <- paste0(colnames(data)[trait_col],"_cv00_fold_",1:folds)
     y_cv00[,] <- data[,trait_col]
-    for (f in 1:folds) {
-      # Find the index for all rows with the same fold value
-      #fold_idx <- which(y_cv1 == f)
-      # Replace y_cv0 values with NA for these indexes
-      #y_cv00[fold_idx,f]<- NA
-      y_cv00[retdf$cv1==f & retdf$cv0==f,f] <- NA
-      y_cv00[retdf$cv1==f,f] <- NA
-      y_cv00[retdf$cv0==f,f] <- NA
+    
+    for(fold in 1:folds)
+    {
+      y_cv00[retdf$cv0==fold,fold] <- NA
+    }
+    
+    y_cv00 <- do.call(cbind, lapply(1:ncol(y_cv00), function(i) matrix(rep(y_cv00[, i], folds), ncol=folds)))
+    colnames(y_cv00) <- paste0(colnames(data)[trait_col],"_cv00_fold_",1:folds^2)
+    
+    for (i in seq(1,folds^2,by=folds)) {
+      
+    for (j in 1:folds){
+      cl_ind<-i+(j-1)
+      
+      y_cv00[retdf$cv1==j ,cl_ind] <- NA
+
+    }
     }
     retdf <- cbind(retdf, y_cv00)
   }
-  
   return(retdf)
   
 }
@@ -445,13 +452,35 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
   eid <- data[, 2]          # Environment IDs
   gid <- data[, 1]          # Line IDs
   eids<- unique(eid)
+
   if (cv %in% c("cv00")) {
-    
-    for (fold in seq_along(cv_data)) {
+
+    idcv00<-list()
+    k<-1
+    for (i in seq(1,folds^2,by=folds)) {
+     
+      for (j in 1:folds){
+        cl_ind<-i+(j-1)
+        
+        idcv00[[cl_ind]]<-which((data$cv0==k) & (data$cv1==j))
+      
+      }
+    k <- (k %% folds) + 1  # 
+    }
+    idcv00<-do.call(cbind,idcv00)
+
+            for (fold in seq_along(cv_data)) {
       # Train data
       y_na <- cv_data[, fold]
       # Test data index
-      testing <- which(is.na(y_na))
+
+      #testing <- which(is.na(y_na))
+      testing<-idcv00[,fold]
+      
+      if(all(is.na(testing))){
+        next
+      }
+      
       # Fit BGLR model with training data
       fm <- BGLR(y=y_na, ETA=eta, nIter=nIter, burnIn=burnIn, verbose=FALSE)
       
@@ -466,7 +495,7 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
   
   if (cv %in% c("cv0")) {
     
-    for (fold in 1:length(unique(rep(1:folds, each=ceiling(length(eids)/folds))[order(runif(length(eids)))]))) {
+    for (fold in 1:folds) {
       y_na <- y
       
       if (fold != -999) {
