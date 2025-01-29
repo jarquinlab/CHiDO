@@ -32,6 +32,7 @@ body <- dashboardBody(
   # Use CSS and JS files in www/ directory
   tags$head(
     tags$link(rel="stylesheet",type="text/css",href="custom.css"),
+    tags$link(rel = "icon", type = "image/png", href = "logo_32x32.png"),
     tags$script(src="custom.js")
   ),
   # Tabs for dashboard
