@@ -345,6 +345,7 @@ prep_data_for_cv <- function(y_data, folds, cv1, cv2, cv0, cv00) {
       # Replace y_cv0 values with NA for these indexes
       
       y_cv0[data[[eid]] %in% fold_envs] <- f
+      #y_cv0[eid %in% fold_envs] <- f
       
     }
     retdf$cv0 <- y_cv0
@@ -495,7 +496,7 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
   
   if (cv %in% c("cv0")) {
     
-    for (fold in 1:folds) {
+    for (fold in 1:length(unique(data$cv0))) {
       y_na <- y
       
       if (fold != -999) {
