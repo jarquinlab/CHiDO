@@ -94,12 +94,12 @@ get_model_accuracy <- function(eid_col, modeldir, group_by_env=FALSE) {
   # Accuracy for each environment
   out_df <- do.call("rbind", output_list) %>% 
     mutate(cv = factor(cv, levels = c("cv2", "cv1", "cv0", "cv00")),
-           env = factor(env)) %>% select(cv, model, env, n, cor)
+           env = factor(env)) %>% dplyr::select(cv, model, env, n, cor)
   
   # Overall accuracy
   tmp2 <- out_df %>% group_by(cv, model) %>% 
     summarise(cor = round(Tiezzi(cor, n), 2), n = sum(n)) %>% 
-    mutate(env = "all") %>% select(cv, model, env, n, cor)
+    mutate(env = "all") %>% dplyr::select(cv, model, env, n, cor)
   
   out_df <- rbind(out_df, tmp2) %>% arrange(cv, model, env)
   
@@ -136,7 +136,7 @@ get_model_accuracy <- function(eid_col, modeldir, group_by_env=FALSE) {
   }
   
   # Save plot
-  ggsave(retplot, filename = file.path(out_dir, paste0(plot_name,".png")))
+  ggsave(retplot, filename = file.path(out_dir, paste0(plot_name,".png")),width=2100,height=2100,units=c("px"))
   saveRDS(retplot, file.path(out_dir, paste0(plot_name, ".rds")))
   
 }
@@ -149,11 +149,11 @@ get_model_rmse <- function(eid_col, model_dir, group_by_env=FALSE) {
   
   out_df = do.call('rbind', output_list) %>% 
     mutate(cv = factor(cv, levels = c('cv2','cv1','cv0','cv00')),
-           env = factor(env)) %>% select(cv, model, env, n, rmse)
+           env = factor(env)) %>% dplyr::select(cv, model, env, n, rmse)
   
   tmp2 = out_df %>% group_by(cv, model) %>%
     summarise(rmse = round(weighted.mean(rmse, n),2), n = sum(n)) %>%
-    mutate(env = "all") %>% select(cv, model, env, n, rmse)
+    mutate(env = "all") %>% dplyr::select(cv, model, env, n, rmse)
   
   out_df = rbind(out_df, tmp2) %>% arrange(cv, model, env)
   
@@ -187,7 +187,7 @@ get_model_rmse <- function(eid_col, model_dir, group_by_env=FALSE) {
   }
   
   # Save the plot
-  ggsave(retplot, filename = file.path(out_dir, paste0(plot_name,".png")))
+  ggsave(retplot, filename = file.path(out_dir, paste0(plot_name,".png")),width=2100,height=2100,units=c("px"))
   saveRDS(retplot, file.path(out_dir, paste0(plot_name, ".rds")))
   
 }
@@ -238,7 +238,7 @@ get_model_varcomps <- function(modeldir) {
   colnames(outdf)[4] = c("percentage")
   write.csv(outdf, file = file.path(out_dir, "varcomps.csv"))
   
-  ggsave(retplot, file = file.path(out_dir, "varcomps.png"))
+  ggsave(retplot, file = file.path(out_dir, "varcomps.png"),width=2100,height=2100,units=c("px"))
   saveRDS(retplot, file.path(out_dir, "varcomps.rds"))
   
   return(retplot)
