@@ -60,7 +60,7 @@ gei_results_tab <- tabItem(
   box(
     class = "upload-box",
     width = 12,
-    div(downloadButton("download_results", "Download Results"),
+    div(downloadButton("download_results_gei", "Download Results"),
         style="margin-top: 10px; margin-bottom: 10px;"),
     gei_results_view_panel
     )

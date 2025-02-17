@@ -997,12 +997,12 @@ server <- function(input, output, session) {
   # Render the data table based on the selected file
   output$results_table <- renderDT({
     req(input$selected_file)
-    file_path <- file.path(tmpdir, "AMMI", input$selected_file)
+    file_path <- file.path(tmpdir, "output", input$selected_file)
     
     if (file.exists(file_path)) {
-      datatable(read.csv(file_path))
+      DT::datatable(read.csv(file_path))
     } else {
-      datatable(data.frame())
+      DT::datatable(data.frame())
     }
   })
   
@@ -1470,21 +1470,21 @@ server <- function(input, output, session) {
   ### Results tab ----
 
   # Reactive poll to check for new files every 5 seconds
-  files_reactive <- reactivePoll(
-    5000, 
-    session,
-    checkFunc = function() {
-      list.files(file.path(tmpdir, "output"), pattern = "\\.csv$", recursive = TRUE)
-    },
-    valueFunc = function() {
-      list.files(file.path(tmpdir, "output"), pattern = "\\.csv$", recursive = TRUE)
-    })
-  
+  #gei_files_reactive <- reactivePoll(
+    #5000, 
+    #session,
+    #checkFunc = function() {
+    #  list.files(file.path(tmpdir, "AMMI"), pattern = "\\.csv$", recursive = TRUE)
+    #},
+    #valueFunc = function() {
+    #  list.files(file.path(tmpdir, "AMMI"), pattern = "\\.csv$", recursive = TRUE)
+    #})
+
   # Generate dynamic UI for file menu
   output$gei_results_menu <- renderUI({
-    files <- files_reactive()
-    if (length(files) > 0) {
-      selectInput("gei_selected_file", "Choose a file:", choices = files)
+    files_gei <- files_reactive()
+    if (length(files_gei) > 0) {
+      selectInput("gei_selected_file", "Choose a file:", choices = files_gei)
     } else {
       p("No CSV files found.")
     }
@@ -1496,9 +1496,9 @@ server <- function(input, output, session) {
     file_path <- file.path(tmpdir, "output",input$gei_selected_file)
     
     if (file.exists(file_path)) {
-      datatable(read.csv(file_path))
+      DT::datatable(read.csv(file_path))
     } else {
-      datatable(data.frame())
+      DT::datatable(data.frame())
     }
   })
   
@@ -1511,7 +1511,6 @@ server <- function(input, output, session) {
       zip::zipr(file, file.path(tmpdir,"output"))
     }
   )
-  
   
   # Data visualizations
   

@@ -1,7 +1,7 @@
 # CHiDO is a no-code platform to integrate multi-omics data to build, train and test
 # linear mixed models for identifying candidates for desired GxE interactions.
 #
-# Copyright (C) 2024 Francisco Gonzalez, Diego Jarquin, and Julian Garcia
+# Copyright (C) 2025 Francisco Gonzalez, Diego Jarquin, and Julian Garcia, Vitor Sagae
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -110,7 +110,6 @@ verify_omic_object <- function(config, phen = FALSE, modtype="Genotype level") {
   if(phen) {         # Data is from phenotype response (Y) file
     if(modtype=="Genotype level"){
     req_fields <- c("gid_col", "eid_col", "trait_col")
-    if(config$AMMI){req_fields<-c(req_fields,"uid_col")}
     }else{
     req_fields <- c("gid_col","g1id_col","g2id_col", "eid_col", "trait_col") 
     }

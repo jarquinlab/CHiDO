@@ -1,7 +1,7 @@
 # CHiDO is a no-code platform to integrate multi-omics data to build, train and test
 # linear mixed models for identifying candidates for desired GxE interactions.
 #
-# Copyright (C) 2024 Francisco Gonzalez, Diego Jarquin, and Julian Garcia
+# Copyright (C) 2025 Francisco Gonzalez, Diego Jarquin, and Julian Garcia, Vitor Sagae
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -63,34 +63,13 @@ get_num_fields_from_list <- function(config) {
   )
 }
 
-#logging <- function(session, message="", t = 0.5) {
-#  if (message == "") { 
-#    message == "clearLogs"
-#  } else {
-#    message = paste0(message,"\n")
-#  }
-#  
-#  session$sendCustomMessage("updateLog", message)
-#  Sys.sleep(t)
-#}
-
-logging <- function(session, message = "", t = 0.5, target = "cv_logs") {
-  
-  if (message == "") {
-    action <- "clearLogs"  # Limpar logs
-    content <- NULL        # Sem conteúdo adicional
+logging <- function(session, message="", t = 0.5) {
+  if (message == "") { 
+    message == "clearLogs"
   } else {
-    action <- "addLog"     # Adicionar log
-    content <- paste0(message, "\n")  # Formata a mensagem
+    message = paste0(message,"\n")
   }
   
-  message_data <- list(
-    target = target,
-    action = action,
-    content = content
-  )
-  
-  session$sendCustomMessage("updateLog", message_data)
-  
+  session$sendCustomMessage("updateLog", message)
   Sys.sleep(t)
 }
