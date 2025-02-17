@@ -20,6 +20,7 @@ library(dplyr)
 library(ggplot2)
 library(BGLR)
 library(gridExtra)
+library(Matrix)
 
 reformat_model <- function(item) {
   # Remove parentheses
@@ -148,7 +149,7 @@ create_g_matrix <- function(o_data, y_data, wht=FALSE, ctr=FALSE, std=FALSE,
   join_id <- o_data$y_col
 
   ids <- factor(y_data$data[, join_id])
-  Z <- as.matrix(model.matrix(~ids - 1))
+  Z <- Matrix(model.matrix(~ids - 1),sparse=TRUE)
 
   # No data, create G from Y values only
   if (is.null(data) || o_data$label %in% c("E","L","L1","L2")) {
@@ -162,8 +163,9 @@ create_g_matrix <- function(o_data, y_data, wht=FALSE, ctr=FALSE, std=FALSE,
     ## Adjusted
     V<-Z
     for(i in 1:ncol(Z)){ V[,i]<-V[,i]/sqrt(d[i]) } 
-    EVD<-list(vectors=V,values=d)
+    EVD<-list(vectors=as.matrix(V),values=d)
     G<-tcrossprod(Z)
+    G[upper.tri(G)]<-0
   } else {
     
     # Filter genomic data based on NaN threshold limit
@@ -191,7 +193,7 @@ create_g_matrix <- function(o_data, y_data, wht=FALSE, ctr=FALSE, std=FALSE,
       GO <- GO[ rownames(GO) %in% unique(ids)  ,  colnames(GO) %in% unique(ids) ]
       
       ids <- factor(ids, levels = rownames(GO))
-      Z <- as.matrix(model.matrix(~ids - 1))
+      Z <- Matrix(model.matrix(~ids - 1),sparse=TRUE)
       GO <- tcrossprod(Z, GO)
       
     } else {
@@ -200,7 +202,10 @@ create_g_matrix <- function(o_data, y_data, wht=FALSE, ctr=FALSE, std=FALSE,
     }
     
     G <- tcrossprod(GO, Z)
-    EVD <- eigen(G)
+    G[upper.tri(G)]<-0
+    G<-drop0(G)
+    EVD <- eigen(G,symmetric = T)
+    EVD[[2]]<-as.matrix(EVD[[2]])
     rownames(EVD$vectors) <- rownames(G)
     
   }
@@ -230,7 +235,7 @@ create_interaction_matrix <- function(termvec, tmpdir) {
     }
   }
   
-  EVD <- eigen(GI)
+  EVD <- eigen(GI,symmetric = TRUE)
   
   return(list(G = GI, EVD = EVD))
 }
@@ -337,35 +342,46 @@ prep_data_for_cv <- function(y_data, folds, cv1, cv2, cv0, cv00) {
   
   if (cv0) {
     y_cv0 <- NA
+    if(folds>length(eids)){folds=length(eids)}
+    
     fold <- rep(1:folds, each=ceiling(length(eids)/folds))[order(runif(length(eids)))]
+
     for (f in 1:length(unique(fold))) {
       # Find the index for all rows with the same fold value
       fold_envs <- eids[fold == f]
       # Replace y_cv0 values with NA for these indexes
       
       y_cv0[data[[eid]] %in% fold_envs] <- f
+      #y_cv0[eid %in% fold_envs] <- f
       
     }
     retdf$cv0 <- y_cv0
   }
   
   if (cv00) {
-    #y_cv00 <- matrix(data[,trait_col], nrow=nrow(data), ncol=folds)
-    y_cv00<-matrix(NA,nrow=dim(data),ncol=folds)
-    colnames(y_cv00) <- paste0(colnames(data)[trait_col],"_cv00_fold_",1:folds)
+    foldscv00<-length(unique(retdf$cv0))*length(unique(retdf$cv1))
+    y_cv00<-matrix(NA,nrow=dim(data),ncol=length(unique(retdf$cv0)))
     y_cv00[,] <- data[,trait_col]
-    for (f in 1:folds) {
-      # Find the index for all rows with the same fold value
-      #fold_idx <- which(y_cv1 == f)
-      # Replace y_cv0 values with NA for these indexes
-      #y_cv00[fold_idx,f]<- NA
-      y_cv00[retdf$cv1==f & retdf$cv0==f,f] <- NA
-      y_cv00[retdf$cv1==f,f] <- NA
-      y_cv00[retdf$cv0==f,f] <- NA
+    
+    for(fold in 1:length(unique(retdf$cv0)))
+    {
+      y_cv00[retdf$cv0==fold,fold] <- NA
+    }
+    
+    y_cv00 <- do.call(cbind, lapply(1:ncol(y_cv00), function(i) matrix(rep(y_cv00[, i], length(unique(retdf$cv1))), ncol=length(unique(retdf$cv1)))))
+    colnames(y_cv00) <- paste0(colnames(data)[trait_col],"_cv00_fold_",1:(foldscv00))
+    
+    for (i in seq(1,ncol(y_cv00),by=length(unique(retdf$cv1)))) {
+      
+    for (j in 1:length(unique(retdf$cv0))){
+      cl_ind<-i+(j-1)
+      
+      y_cv00[retdf$cv1==j ,cl_ind] <- NA
+
+    }
     }
     retdf <- cbind(retdf, y_cv00)
   }
-  
   return(retdf)
   
 }
@@ -422,7 +438,7 @@ get_predictions <- function(data, tmpdir, model_selected, model_eq, cv, folds,
     predictions <- fit_cv(cv, cv_data, data, folds, predictions, eta, nIter, burnIn)
     
     write.csv(predictions, file=file.path(outdir, paste0(cv, ".csv")), row.names = FALSE)
-    
+
   } else {
     # Using full data to get variance components
     fm <- BGLR(y=y,ETA=eta,nIter=nIter,burnIn=burnIn,verbose=TRUE)
@@ -445,18 +461,40 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
   eid <- data[, 2]          # Environment IDs
   gid <- data[, 1]          # Line IDs
   eids<- unique(eid)
+
   if (cv %in% c("cv00")) {
-    
+
+    idcv00<-list()
+    k<-1
+    for (i in seq(1,length(unique(data$cv0))*length(unique(data$cv1)),by=length(unique(data$cv1)))) {
+     
+      for (j in 1:length(unique(data$cv1))){
+        cl_ind<-i+(j-1)
+        
+        idcv00[[cl_ind]]<-which((data$cv0==k) & (data$cv1==j))
+      
+      }
+    k <- (k %% length(unique(data$cv0))) + 1  # 
+    }
+    idcv00<-do.call(cbind,idcv00)
+
     for (fold in seq_along(cv_data)) {
       # Train data
       y_na <- cv_data[, fold]
       # Test data index
-      testing <- which(is.na(y_na))
+
+      #testing <- which(is.na(y_na))
+      testing<-idcv00[,fold]
+      
+      if(all(is.na(testing))){
+        next
+      }
+      
       # Fit BGLR model with training data
       fm <- BGLR(y=y_na, ETA=eta, nIter=nIter, burnIn=burnIn, verbose=FALSE)
       
       # Predict with the fitted model
-      preds <- data.frame(testing = testing, fold = fold, env = eid[testing],
+      preds <- data.frame(testing = testing, fold = paste0("CV1:",data$cv1[testing],"x","CV0:",data$cv0[testing],sep=" "), env = eid[testing],
                           individual = gid[testing], observed = y[testing],
                           predicted = round(fm$yHat[testing],3))
       
@@ -465,8 +503,8 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
   }
   
   if (cv %in% c("cv0")) {
-    
-    for (fold in 1:length(unique(rep(1:folds, each=ceiling(length(eids)/folds))[order(runif(length(eids)))]))) {
+
+    for (fold in 1:length(unique(data$cv0))) {
       y_na <- y
       
       if (fold != -999) {
