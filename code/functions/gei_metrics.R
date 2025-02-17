@@ -66,6 +66,7 @@ average_scores<-function(outdir,k=2,r,cc){
   colnames(b)<-c("Component 1","Component 2")
   rownames(b)<-rownames(scores)
   
+  if (sum(duplicated(c(tratamientos,sitios)))>0){rownames(b)<-c(paste0("G",1:r),paste0("E",1:cc),1)}
   write.table(b,file=file.path(outdir, 'average_scores.csv'),row.names = TRUE,col.names=TRUE, sep = ",")
 
   #write.table(b,file='average_scores.csv',row.names = TRUE,col.names=TRUE) #remove
