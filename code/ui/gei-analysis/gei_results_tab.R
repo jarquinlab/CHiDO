@@ -25,11 +25,44 @@ source("code/functions/utils.R")
 ### UI instructions ----
 ### Supporting objects ----
 
-about_md <- markdown::renderMarkdown(file="README.md")
+metrics_choices_gei<-list(
+  "bammi"=c("Trace mu","Trace tau","Trace Lambda PC1","Trace Lambda PC2","AMMI Plot"),
+  "bstab"=c("Stabdist Plot"),
+  "bwaas"=c("Waas Plot"),
+  "bwaasy"=c("Waasy Plot")
+)
+
+gei_results_view_panel <- tabsetPanel(
+  tabPanel(
+    "Tables",
+    div(style="margin-top: 15px;", uiOutput("gei_results_menu")),
+    div(style="overflow-y: scroll;", DTOutput("gei_results_table"))
+    ),
+  tabPanel(
+    style="height:800px;",
+    "Visualizations",
+    div(style="padding: 10px;", selectInput("gei_metrics", "Select a visual:", 
+                choices = NULL)
+        ),
+   div(style="align-items:center;", uiOutput("plot_or_message_gei"))
+    
+  )
+)
+
+# Download results
 
 ### Main tab ----
 
-about_tab <- tabItem(
-  tabName = "about",
-  HTML(about_md)
+gei_results_tab <- tabItem(
+  tabName = "gei_results",
+  h1("View and Download Results", class="tab-header"),
+  fluidRow(
+  box(
+    class = "upload-box",
+    width = 12,
+    div(downloadButton("download_results", "Download Results"),
+        style="margin-top: 10px; margin-bottom: 10px;"),
+    gei_results_view_panel
+    )
+  )
 )

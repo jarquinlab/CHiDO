@@ -1,7 +1,7 @@
 # CHiDO is a no-code platform to integrate multi-omics data to build, train and test
 # linear mixed models for identifying candidates for desired GxE interactions.
 #
-# Copyright (C) 2025 Francisco Gonzalez, Diego Jarquin, and Julian Garcia, Vitor Sagae
+# Copyright (C) 2024 Francisco Gonzalez, Diego Jarquin, and Julian Garcia
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -17,8 +17,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # Created by: Francisco Gonzalez
-# Last updated by: Francisco Gonzalez, Julian Garcia, Vitor Sagae
-# Last updated: 01/10/2025
+# Last updated by: Francisco Gonzalez
+# Last updated: 06/10/2024
 
 ### Libraries ----
 
@@ -36,6 +36,8 @@ source("code/functions/utils.R")
 source("code/functions/data.R")
 source("code/functions/model.R")
 source("code/functions/metrics.R")
+source("code/functions/gei_model.R")
+source("code/functions/gei_metrics.R")
 
 create_temp_dir <- function() {
   tmpdir <- tempdir()
@@ -47,8 +49,8 @@ server <- function(input, output, session) {
   
   ### Global ----
   
-  # Set maximm file size to 50MB 
-  options(shiny.maxRequestSize = 50 * 1024 ^ 2)
+  # Set maximm file size to 50MB # I Changed to 100 mb to test
+  options(shiny.maxRequestSize = 100 * 1024 ^ 2)
   
   # Create temporary directory for session files
   tmpdir <- create_temp_dir()
@@ -995,7 +997,7 @@ server <- function(input, output, session) {
   # Render the data table based on the selected file
   output$results_table <- renderDT({
     req(input$selected_file)
-    file_path <- file.path(tmpdir, "output", input$selected_file)
+    file_path <- file.path(tmpdir, "AMMI", input$selected_file)
     
     if (file.exists(file_path)) {
       datatable(read.csv(file_path))
@@ -1052,6 +1054,528 @@ server <- function(input, output, session) {
     
     if (file.exists(img_path)) {
       imageOutput("plot")
+    } else {
+      renderText("No plots available yet")
+    }
+  })
+  
+  # AMMI and Bayesian indexes (GEI analyses)
+  
+  ### GEI Data tab ----
+  # Generate a dynamic upload panel to select columns
+  output$gei_y_panel<-renderUI({
+      panel<-div(create_input_box('*Genotype ID column:', "gid_col", 1),
+                 create_input_box("*Environment ID column:", "eid_col", 2),
+                 create_input_box("*Individual ID (UID) column:", "uid_col",3),
+                 create_input_box("*Target trait column:", "trait_col", 4))
+  })
+  
+  # Loading Y file after upload button is pressed
+  observeEvent(input$gei_y_load, {
+    config <- create_omic_config(input$gei_y_file, "Y", "phenotypic",modtype="Genotype level", input$trait_col, 
+                                 gid_col = input$gid_col, eid_col = input$eid_col,
+                                 uid_col = input$uid_col)
+    config$AMMI<-TRUE
+    # Check if data was uploaded.
+    if(is.null(config)) {
+      showNotification("No file was uploaded, try again.", type="error")
+      return()
+    }
+    
+    # Verify uploaded data
+    verified <- verify_omic_object(config, phen = TRUE,modtype="Genotype level")
+
+    if(verified) {
+      
+      # Add data to metadata config 
+      config$data <- load_data(input$gei_y_file$datapath)
+
+      # Grab values from reactive objects
+      phen_data(config)
+      curr_data <- data_sources()
+      
+      if (is.na(input$uid_col)){
+        for (omic in c("E","L")) {
+          
+          if(omic == "E") {
+            data_type = "Environment IDs"
+            link = "Environment ID"
+            id_col = input$eid_col
+          } else {
+            data_type = "Line IDs"
+            link = "Genotype / Line ID"
+            id_col = input$gid_col
+          }
+ 
+          # Get config for ID column
+          curr_omic <- create_omic_config(input$gei_y_file, omic, data_type,modtype="Genotype level",id_col,
+                                          link = link)
+          # Load data as data.frame for that respective column
+          curr_omic$data <- config$data[, id_col, drop=FALSE]
+
+          curr_data[[curr_omic$label]] <- curr_omic
+          
+          # Add omic to preview table
+          curr_table <- table_data()
+          updated_table <- update_table(curr_table, curr_data[[curr_omic$label]])
+          table_data(updated_table)
+        }}else{
+          for (omic in c("E","L","R")) {
+            
+            if(omic == "E") {
+              data_type = "Environment IDs"
+              link = "Environment ID"
+              id_col = input$eid_col
+            } else if (omic == "L") {
+              data_type = "Line IDs"
+              link = "Genotype / Line ID"
+              id_col = input$gid_col
+            } else{
+              data_type = "Line Replicates"
+              link = "Genotype / Line ID"
+              id_col = input$uid_col
+            }
+            
+            # Get config for ID column
+            curr_omic <- create_omic_config(input$gei_y_file, omic, data_type,modtype="Genotype level",id_col,
+                                            link = link)
+            # Load data as data.frame for that respective column
+            curr_omic$data <- config$data[, id_col, drop=FALSE]
+            
+            curr_data[[curr_omic$label]] <- curr_omic
+            
+            # Add omic to preview table
+            curr_table <- table_data()
+            updated_table <- update_table(curr_table, curr_data[[curr_omic$label]])
+            table_data(updated_table)
+          }
+        }
+      
+      # Save data added for E and L
+      data_sources(curr_data)
+      # Update avalable omics in model assembly page
+      updateSelectInput(session, "gei_labels", choices = names(data_sources()))
+      showNotification("Data was successfully uploaded!", type="message")
+      
+    } else {
+      showNotification("Error: check the data entered in the upload box.", type="error")
+      return()
+    }
+    
+    }
+  )
+  
+  # Display data in the available table
+  output$gei_table <- renderDataTable({
+    datatable(table_data()[,1:4],
+              editable = FALSE,
+              options = list(
+                # Can only select 1 row at a time
+                select = list(style="single", target="row"),
+                lengthChange = FALSE,
+                searching = FALSE
+              ))
+  })
+  
+  # Delete a row from the Available table
+  observeEvent(input$gei_delete_rows, {
+    select_rows <- input$gei_table_rows_selected
+    
+    if(length(select_rows) > 0) {
+      # Create new table object without these rows
+      curr_table <- table_data()[-select_rows,]
+      # Delete the associated omics
+      del_gei <- table_data()[select_rows, 1]
+      curr_data <- data_sources()
+      curr_data <- curr_data[!(names(curr_data) %in% del_gei)]
+      # Update table
+      table_data(curr_table)
+      data_sources(curr_data)
+    }
+  })
+  
+  # Consistently update omics to view their data 
+  output$gei_labels <- renderUI({
+    selectInput("gei_labels","Select omic to view:",choices=names(data_sources()))
+  })
+  
+  # Display data for a specific omic
+  output$gei_table_to_view <- renderDT({
+    gei <- input$gei_labels
+    DT::datatable(data_sources()[[gei]]$data, options = list(
+      searching = TRUE,
+      scroller = TRUE,
+      scrollX = TRUE
+    ))
+  })
+  
+  ### GEI Run analysis tab ----
+  
+  # Update and sync the slider and input fields for hyperparameters
+  observeEvent(input$gei_n_iter_input, {
+    updateSliderInput(session, "gei_n_iter_slider", value = input$gei_n_iter_input)
+  })
+  observeEvent(input$gei_n_iter_slider, {
+    updateNumericInput(session, "gei_n_iter_input", value = input$gei_n_iter_slider)
+  })
+  observeEvent(input$gei_burn_in_input, {
+    updateSliderInput(session, "gei_burn_in_slider", value = input$gei_burn_in_input)
+  })
+  observeEvent(input$gei_burn_in_slider, {
+    updateNumericInput(session, "gei_burn_in_input", value = input$gei_burn_in_slider)
+  })
+  
+  # Generate a dynamic weigh panel if waasy is selected
+  output$weigh_panel <- renderUI({
+    if(input$bwaasy){
+      
+    # weights
+      panel <- div(
+        style="width: 200%;",
+        tags$head(
+          tags$style(HTML("
+      .irs-min, 
+      .irs-max { 
+        display: none !important; 
+      }
+    ")) 
+        ),
+        tags$label('*Weights between response variable and absolute scores:', 
+                   style = "display: block; margin-bottom: 5px;"),
+        div(
+          style = "margin-top: 20px; width: 100%; position: relative;", # Define largura e posicionamento relativo
+          sliderInput(
+            inputId = "weights",
+            label = NULL, # Remove label padrão
+            min = 0,
+            max = 100,
+            value = 50,
+            step = 1
+          ),
+          # Labels personalizadas no lugar dos valores padrão
+          div(
+            style = "display: flex; justify-content: space-between; position: absolute; width: 100%; top: -12px;",
+            tags$span("Response variable", style = "font-size: 12px; color: black;"), # Label personalizada no lugar do 0
+            tags$span("Absolute scores", style = "font-size: 12px; color: black;")    # Label personalizada no lugar do 100
+          )
+        )
+      )
+
+    }
+    }
+  )
+  
+  
+  # Run the selected analyses
+  observeEvent(input$run_gei, {
+    
+    # Restart logs
+    logging(session,target="gei_logs")
+    
+    ### 1/6 -- Gather all parameters ###
+    logging(session, "[Step 1/6] Checking tuning parameters.",target="gei_logs")
+    
+    # Tuning parameters
+    nIter <- input$gei_n_iter_input
+    burnIn <- input$gei_burn_in_input
+    thin <- input$gei_thin_input
+    seed <- input$gei_set_seed
+    trait_col<-input$trait_col
+    gid_col<-input$gid_col
+    eid_col<-input$eid_col
+    uid_col<-input$uid_col
+    chains<-input$gei_chains
+    
+    # GEI Methods
+    ammi <- input$bammi
+    waas <- input$bwaas
+    waasy <- input$bwaasy
+    stabdist<- input$bstab
+    
+    if(waasy){ammi=TRUE}
+    if(waas){ammi=TRUE}
+    if(stabdist){ammi=TRUE}
+    
+    # Data for run analysis
+    ds <- data_sources()
+    
+    # Building DF to pre-analisys
+    ydata <- phen_data()
+    
+    # Get list of labels
+    labels <- names(df)
+    
+    ### 2/6 -- Obtaining initial parameters ###
+    logging(session, "Step [2/6] Obtaining initial parameters.",target="gei_logs")
+    
+    if (!ammi) {
+      showNotification("Please check at least one procedure to be executed.",
+                       type = "error")
+      return()
+    }
+    
+    # Fit initial linear model to obtain a residual value
+    logging(session, paste("1 ==> Fitting an initial bilinear model to obtain a residual estimative."),target="gei_logs")
+      
+    ### 3/6 -- Generating Gibbs sampler chains ###
+    logging(session, "Step [3/6] Generating Gibbs sampler chains.",target="gei_logs")
+    
+    set.seed(seed)
+    outdir <- file.path(tmpdir,"output/AMMI")
+    if (!dir.exists(outdir)) { dir.create(outdir, recursive = TRUE)}
+    
+    chain_list<-list()
+    for(chain in 1:chains){
+    bilinear<-bilinear_model(ydata$data, trait_col, eid_col, gid_col, uid_col)
+      
+    exit1<-NULL
+    nombre1 <- file.path(outdir,paste0("chain_",chain,"_output.csv",sep=""))
+    write.table(exit1,file=nombre1,append = FALSE, quote = TRUE, sep = " , ",row.names = FALSE,col.names = FALSE)
+    
+    logging(session, paste0(chain," ==> Generating chain number: ", chain),target="gei_logs")
+    
+      # Values for hyper-parameters 
+      sigma2_u<<-1*10^15
+      alfa_sig_ap<<-0
+      beta_sig_ap<<-0
+      mu_tao_ap<<-rep(0,r)
+      sig_tao_ap<<-(1*10^15)
+      mu_del_ap<<-rep(0,cc)
+      sig_del_ap<<-(1*10^15)
+      mu_lamb_ap<<-0
+      sig_lamb_ap<<-1*10^15
+      
+      # Initial values for bilinear terms 
+      alphas0 <- bilinear[[12]]
+      gammas0 <- bilinear[[13]]
+      lambdas0 <- bilinear[[11]]
+      
+    times<-1
+    gibbs_chain(exit1,nombre1,nIter,times,alphas0,gammas0,lambdas0)
+    
+    chain_list[[chain]]<-read.csv(nombre1,header=FALSE)
+    }
+    
+    logging(session, "Chains were sucessfully generated!",target="gei_logs")
+
+    
+    ### 4/6 -- Conducting analyses ###
+    logging(session, "Step [4/6] Conducting analyses.",target="gei_logs")
+    logging(session, paste0("1 ==> Removing burn-in iterations. "),target="gei_logs")
+    chain_list<-burnin_filter(chain_list,burnIn,r,cc,k)
+
+    # TODO dependence and stationary tests
+    
+    logging(session, paste0("2 ==> Applying thin. "),target="gei_logs")
+    chain_list<-thin_filter(chain_list,nIter,burnIn,thin)
+
+    logging(session, paste0("3 ==> Merging chains. "),target="gei_logs")
+    chains<-do.call(rbind,chain_list)
+    # Save chains
+    
+    write.table(chains, file=file.path(outdir, 'chains.csv'),quote=TRUE,sep=",",row.names=F,col.names=TRUE)
+
+    mu    <<-  chains[,1]
+    tau   <<-  chains[,2]
+    tao <<-  chains[,3:(2+r)]
+    beta  <-  chains[,(2+r+1):(2+r+cc)]
+    
+    alpha <- chains[,(2+r+cc+1):(2+r+cc+r*k)] #U
+    gamma <- chains[,(2+r+cc+r*k+1):(2+r+cc+r*k+cc*k)] #VT
+    lambda <- chains[,(2+r+cc+r*k+cc*k+1):(2+r+cc+r*k+cc*k+k)] #lambda
+    
+    saving_parameters(outdir,mu,tau,tao,beta,lambda,alpha,gamma)
+    
+    if(waas){
+    logging(session, paste0("4 ==> WAAS index. "),target="gei_logs")
+      
+    out <- file.path(tmpdir,"output/WAAS")
+    if (!dir.exists(out)) { dir.create(out, recursive = TRUE)}
+        
+    waas<-waas_index(outdir,bilinear[[4]])
+    #write.csv(waas,file="waas.csv",row.names=F)
+    write.csv(waas,file=file.path(out, 'waas.csv'),row.names=F)
+    waas_plot(waas,tmpdir,bilinear[[4]])}
+    if(waasy){
+    logging(session, paste0("4 ==> WAASY index. "),target="gei_logs")
+    
+    out <- file.path(tmpdir,"output/WAASY")
+    if (!dir.exists(out)) { dir.create(out, recursive = TRUE)}
+    
+    wts<-input$weights
+    waasy<-waasy_index(outdir,bilinear[[4]],wts)
+    #write.csv(waasy,file="waasy.csv",row.names=F)
+    write.csv(waasy,file=file.path(out, 'waasy.csv'),row.names=F)
+    
+    waasy_plot(waasy,tmpdir,bilinear[[4]])
+    }
+    if(stabdist){stabdist<-stabdist_index(outdir,bilinear[[4]])
+    logging(session, paste0("4 ==> STABDIST index. "),target="gei_logs")
+    
+    out <- file.path(tmpdir,"output/STABDIST")
+    if (!dir.exists(out)) { dir.create(out, recursive = TRUE)}
+    
+    means<-mean_gen(outdir,bilinear[[4]])
+    stabdist_merged<-data.frame(means,stabdist[,-1])
+    stabdist_merged$Genotype<-tratamientos
+    write.csv(stabdist_merged,file=file.path(out, 'stabdist.csv'),row.names=F)
+    
+    stabdist_plot(stabdist_merged,tmpdir,bilinear[[4]])}
+    
+    #hpd<-hpd_intervals(chains,outdir)
+    #write.table(hpd,file="hpd.csv",row.names=F,col.names=T,sep=",")
+    logging(session, paste0("5 ==> Calculating high posterior density intervals. "),target="gei_logs")
+    hpd_intervals(chains,outdir)
+    logging(session, paste0("6 ==> Obtaining estimated parameters. "),target="gei_logs")
+ 
+    scores<-average_scores(outdir,k=2,r,cc)
+    
+    logging(session, paste0("7 ==> Analyses were sucessfully done!. "),target="gei_logs")
+    
+
+    ### 5/6 -- Building plots. ###
+    logging(session, "Step [5/5] Building plots.",target="gei_logs")
+    
+    logging(session, paste0("1 ==> Trace plots. "),target="gei_logs")
+    
+    trace_plots(tmpdir,tau,mu,lambda)
+    
+    if(input$bammi){
+      logging(session, paste0("2 ==> Biplot. "),target="gei_logs")
+      bayesian_biplot(tmpdir,scores,lambda,r)}
+    
+    ### Complete, notify user ###
+    logging(session, "END: The analyses are completed!")
+    
+        Sys.sleep(1)
+        showModal(
+          modalDialog(title = "Notification",
+                      "Analyse(s) completed! Please go to the 'Results' tab to view outcome",
+                      easyClose = TRUE,
+                      footer = tagList(actionButton("go_to_results_gei", "View Results")))
+        )
+  })
+
+  observeEvent(input$go_to_results_gei, {
+    removeModal()
+    updateTabItems(session, "tabs", "gei_results")
+  })
+  
+  # Render log messages reactively
+  output$gei_logs <- renderText({
+    invalidateLater(1000, session)  # Check for updates every second
+    logs()
+  })
+  
+  ### Results tab ----
+
+  # Reactive poll to check for new files every 5 seconds
+  files_reactive <- reactivePoll(
+    5000, 
+    session,
+    checkFunc = function() {
+      list.files(file.path(tmpdir, "output"), pattern = "\\.csv$", recursive = TRUE)
+    },
+    valueFunc = function() {
+      list.files(file.path(tmpdir, "output"), pattern = "\\.csv$", recursive = TRUE)
+    })
+  
+  # Generate dynamic UI for file menu
+  output$gei_results_menu <- renderUI({
+    files <- files_reactive()
+    if (length(files) > 0) {
+      selectInput("gei_selected_file", "Choose a file:", choices = files)
+    } else {
+      p("No CSV files found.")
+    }
+  })
+  
+  # Render the data table based on the selected file
+  output$gei_results_table <- renderDT({
+    req(input$gei_selected_file)
+    file_path <- file.path(tmpdir, "output",input$gei_selected_file)
+    
+    if (file.exists(file_path)) {
+      datatable(read.csv(file_path))
+    } else {
+      datatable(data.frame())
+    }
+  })
+  
+  # Download analyses results
+  output$download_results_gei <- downloadHandler(
+    filename = function() {
+      paste0("results_", Sys.Date(), ".zip")
+    },
+    content = function(file) {
+      zip::zipr(file, file.path(tmpdir,"output"))
+    }
+  )
+  
+  
+  # Data visualizations
+  
+  observeEvent(input$run_gei, {
+    selected_categories <- c()
+    
+    if (input$bammi) selected_categories <- c(selected_categories, "bammi")
+    if (input$bwaas) selected_categories <- c(selected_categories, "bwaas")
+    if (input$bwaasy) selected_categories <- c(selected_categories, "bwaasy")
+    if (input$bstab) selected_categories <- c(selected_categories, "bstab")
+    
+    combined_options <- c(unlist(metrics_choices_gei[selected_categories],use.names=F))
+
+    updateSelectInput(
+      inputId = "gei_metrics",
+      choices = combined_options
+    )
+
+  })
+
+  
+  output$plot_gei <- renderImage({
+    req(input$gei_metrics)
+    
+    image_list <- list(
+      "Trace mu" = "trace_mu.png",
+      "Trace tau" = "trace_tau.png",
+      "Trace Lambda PC1" = "trace_lambda1.png",
+      "Trace Lambda PC2" = "trace_lambda2.png",
+      "AMMI Plot" = "bayesian_ammi.png",
+      "Waas Plot" = "waas_plot.png",
+      "Waasy Plot"= "waasy_plot.png",
+      "Stabdist Plot"= "stabdist_plot.png"
+    )
+    
+    filename <- image_list[[input$gei_metrics]]
+
+    img_path <- file.path(tmpdir, "output", "visualizations", filename)
+    # Check if the selected image file exists
+    if (file.exists(img_path)) {
+      list(src = img_path, contentType = "image/png", alt = "Plot", style = "min-width: 70%; max-width: 100%; min-height: 500px; max-height: 600px;")
+    } else {
+      return(NULL)
+    }
+    
+  }, deleteFile = FALSE)
+  
+  output$plot_or_message_gei <- renderUI({
+    image_list <- list(
+      "Trace mu" = "trace_mu.png",
+      "Trace tau" = "trace_tau.png",
+      "Trace Lambda PC1" = "trace_lambda1.png",
+      "Trace Lambda PC2" = "trace_lambda2.png",
+      "AMMI Plot" = "bayesian_ammi.png",
+      "Waas Plot" = "waas_plot.png",
+      "Waasy Plot"= "waasy_plot.png",
+      "Stabdist Plot"= "stabdist_plot.png"
+    )
+    
+    filename <- image_list[[input$gei_metrics]]
+    img_path <- file.path(tmpdir, "output", "visualizations", filename)
+
+    if (file.exists(img_path)) {
+      imageOutput("plot_gei")
     } else {
       renderText("No plots available yet")
     }
