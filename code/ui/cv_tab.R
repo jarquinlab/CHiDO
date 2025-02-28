@@ -17,7 +17,7 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # Created by: Francisco Gonzalez
-# Last Updated By: Francisco Gonzalez
+# Last Updated By: Vitor Sagae
 # Last Updated: 01/10/2025
 
 source("code/functions/utils.R")

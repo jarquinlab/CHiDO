@@ -303,8 +303,8 @@ prep_data_for_cv <- function(y_data, folds, cv1, cv2, cv0, cv00) {
   col_folds <- ncol(data)
   
   # Replace NA values with 0 for now
-  na_rows <- which(is.na(data[, trait_col]))
-  data[na_rows, trait_col] <- 0
+  # na_rows <- which(is.na(data[, trait_col]))
+  # data[na_rows, trait_col] <- 0
   
   # Prepare data.frame to return
   retdf <- as.data.frame(data[, gid])

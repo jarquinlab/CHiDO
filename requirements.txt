@@ -7,6 +7,12 @@ ggplot2
 viridis
 scales
 gridExtra
+Matrix
+lme4
+coda
+mvtnorm
+rstiefel
+tmvtnorm
 DT
 zip
 markdown

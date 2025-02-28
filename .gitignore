@@ -1,9 +1,10 @@
 .Rproj.user
+.Rproj
 .Rhistory
 .RData
 .Ruserdata
 .DS_Store
 manifest.json
-
 docs/
 rsconnect/
+README.html
