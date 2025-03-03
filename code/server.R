@@ -881,7 +881,8 @@ server <- function(input, output, session) {
         if (!dir.exists(outdir)) { dir.create(outdir, recursive = TRUE)}
         
         G <- result[["G"]]
-        EVD <- result[["EVD"]]
+        #EVD <- result[["EVD"]]
+        EVD<-eigen(G,symmetric = TRUE)
         
         save(G, file=file.path(outdir,"G.rda"))
         save(EVD, file=file.path(outdir,"EVD.rda"))
