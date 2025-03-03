@@ -17,13 +17,16 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # Created by: Francisco Gonzalez
-# Last updated by: Francisco Gonzalez
-# Last updated: 06/09/2024
+# Last updated by: Vitor Sagae
+# Last updated: 02/27/2025
 
-source("code/ui/data_tab.R")
-source("code/ui/model_tab.R")
-source("code/ui/cv_tab.R")
-source("code/ui/results_tab.R")
+source("code/ui/mo-prediction/data_tab.R")
+source("code/ui/mo-prediction/model_tab.R")
+source("code/ui/mo-prediction/cv_tab.R")
+source("code/ui/mo-prediction/results_tab.R")
+source("code/ui/gei-analysis/gei_data_tab.R")
+source("code/ui/gei-analysis/runana_tab.R")
+source("code/ui/gei-analysis/gei_results_tab.R")
 source("code/ui/about_tab.R")
 
 body <- dashboardBody(
@@ -32,8 +35,8 @@ body <- dashboardBody(
   # Use CSS and JS files in www/ directory
   tags$head(
     tags$link(rel="stylesheet",type="text/css",href="custom.css"),
+    tags$script(src="custom2.js"),
     tags$link(rel = "icon", type = "image/png", href = "logo_32x32.png"),
-    tags$script(src="custom.js")
   ),
   # Tabs for dashboard
   tabItems(
@@ -41,19 +44,29 @@ body <- dashboardBody(
     model_tab,
     cv_tab,
     results_tab,
+    gei_data_tab,
+    runana_tab,
+    gei_results_tab,
     about_tab
   )
 )
 
 sidebar <- dashboardSidebar(
- sidebarMenu(
-   id = "tabs",
-   menuItem("Upload Omics", tabName="data"),
-   menuItem("Create Model(s)", tabName="model"),
-   menuItem("Train/Validate Model(s)", tabName="validate"),
-   menuItem("View CV results", tabName="results"),
-   menuItem("About", tabName="about")
- ) 
+  sidebarMenu(
+    id = "tabs",
+    menuItem("Multi-omic Prediction",tabName="prediction", startExpanded = TRUE,
+             menuSubItem("Upload Data", tabName="data", icon = icon("arrow-right")),
+             menuSubItem("Create Model(s)", tabName="model", icon = icon("arrow-right")),
+             menuSubItem("Train/Validate Model(s)", tabName="validate", icon=icon("arrow-right")),
+             menuSubItem("View CV results", tabName="results", icon = icon("arrow-right"))),
+   
+    menuItem("GEI Analysis", tabName="gei",startExpanded = FALSE,
+      menuSubItem("Upload Data", tabName="gei_data", icon = icon("arrow-right")),
+      menuSubItem("Run model", tabName="run_gei_tab", icon = icon("arrow-right")),
+      menuSubItem("View results", tabName="gei_results", icon = icon("arrow-right"))),
+    
+    menuItem("About", tabName="about")
+  ) 
 )
 
 header <- dashboardHeader(

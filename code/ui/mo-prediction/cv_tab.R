@@ -1,7 +1,7 @@
 # CHiDO is a no-code platform to integrate multi-omics data to build, train and test
 # linear mixed models for identifying candidates for desired GxE interactions.
 #
-# Copyright (C) 2025 Francisco Gonzalez, Diego Jarquin, and Julian Garcia, Vitor Sagae
+# Copyright (C) 2024 Francisco Gonzalez, Diego Jarquin, and Julian Garcia
 #
 # This program is free software: you can redistribute it and/or modify
 # it under the terms of the GNU Affero General Public License as
@@ -17,8 +17,8 @@
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 # Created by: Francisco Gonzalez
-# Last Updated By: Vitor Sagae
-# Last Updated: 01/10/2025
+# Last Updated By: Francisco Gonzalez
+# Last Updated: 06/09/2024
 
 source("code/functions/utils.R")
 
@@ -79,7 +79,7 @@ preprocess_box <- box(
 )
 
 cv_box <- fluidRow(
-  tags$head(tags$script(src = "custom.js")),
+  tags$head(tags$script(src = "custom2.js")),
   box(
     width = 12,
     class = "upload-box",

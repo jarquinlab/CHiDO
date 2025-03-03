@@ -43,3 +43,11 @@
   padding: 10px; /* Optional: adds some padding inside the log box */
   border: 1px solid #ddd; /* Optional: adds a border around the log box */
 }
+
+#gei_logs {
+  max-height: 200px; /* Adjust based on your needs */
+  overflow-y: auto; /* Enables vertical scrolling */
+  background-color: #f5f5f5; /* Optional: changes background color */
+  padding: 10px; /* Optional: adds some padding inside the log box */
+  border: 1px solid #ddd; /* Optional: adds a border around the log box */
+}

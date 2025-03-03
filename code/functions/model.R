@@ -235,9 +235,11 @@ create_interaction_matrix <- function(termvec, tmpdir) {
     }
   }
   
-  EVD <- eigen(GI,symmetric = TRUE)
+  #EVD <- eigen(GI,symmetric = TRUE)
   
-  return(list(G = GI, EVD = EVD))
+  #return(list(G = GI, EVD = EVD))
+  return(list(G = GI))
+  
 }
 
 get_evd_plots <- function(EVD, out_path) {
