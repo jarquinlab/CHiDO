@@ -82,12 +82,19 @@ server <- function(input, output, session) {
                  create_input_box("*Environment ID column:", "eid_col", 2),
                  create_input_box("Individual ID (UID) column:", "uid_col"),
                  create_input_box("*Target trait column:", "trait_col", 3))
-    }else{
+    }else if(input$modtype%in%"Combining ability"){
       
       panel<-div(create_input_box('*Genotype ID column:', "gid_col", 1),
                  create_input_box('*Parent Group 1 ID column:', "g1id_col", 2),
                  create_input_box('*Parent Group 2 ID column:', "g2id_col", 3),
                  create_input_box("*Environment ID column:", "eid_col", 4),
+                 create_input_box("Individual ID (UID) column:", "uid_col"),
+                 create_input_box("*Target trait column:", "trait_col", 5))
+    }else{
+      panel<-div(create_input_box('*Host-pathogen ID column:', "gid_col", 1),
+                 create_input_box('*Host ID column:', "hostid_col", 2),
+                 create_input_box('*Pathogen ID column:', "patid_col", 3),
+                 #create_input_box("*Environment ID column:", "eid_col", 4),
                  create_input_box("Individual ID (UID) column:", "uid_col"),
                  create_input_box("*Target trait column:", "trait_col", 5))
     }
@@ -125,7 +132,7 @@ server <- function(input, output, session) {
         )
       }
     }
-    else{
+    else if((input$modtype=="Combining ability")){
       #if (input$data_type %in% c("high-throughput data", "other")) {
       id_col <- tolower(input$label)
       
@@ -148,6 +155,27 @@ server <- function(input, output, session) {
         )
       )
       #} 
+    }else{
+      id_col <- tolower(input$label)
+      
+      panel <- conditionalPanel(
+        condition = paste0("input.data_type == '", input$data_type, "'"),
+        # Label
+        div(style="display: flex; align-items: center; margin-top: -20px; padding: 2px;", 
+            tags$label("Reference Label:", style="width:200px;"),
+            div(style="margin-left: auto; min-width: 60px; max-width: 70px;",
+                textInput("label", "", input$label))
+        ),
+        # ID
+        div(style="display: flex; align-items: center; margin-top: -20px; padding: 2px;", 
+            tags$label("Linkage column (relation to Y):", style="width: 200px;"),
+            div(style="margin-left: auto; min-width: 60px; max-width: 100px;", 
+                numericInput("id_col", "", value = 1, min = 1, max = 999))
+        ),
+        selectInput("linkage_type", "Linkage type", 
+                    c("Host ID", "Pathogen ID", "Compound ID / UID")
+        )
+      )
     }
   })
   
@@ -155,8 +183,10 @@ server <- function(input, output, session) {
   observeEvent(input$modtype,{
     omic<-if (input$modtype=="Genotype level"){
       omic_types_gen
-    }else{
+    }else if(input$modtype=="Combining ability"){
       omic_types_cga
+    }else{
+      omic_types_hp
     }
     updateSelectInput(session,"data_type",choices=omic)
   })
@@ -167,6 +197,9 @@ server <- function(input, output, session) {
       input$data_type,
       "genomic markers" = {
         updateTextInput(session, "label", value="G")
+      },
+      "genomic relationship matrix" = {
+        updateTextInput(session, "label", value="R")
       },
       "phenomic markers" = {
         updateTextInput(session, "label", value="P")
@@ -193,9 +226,13 @@ server <- function(input, output, session) {
       config <- create_omic_config(input$y_file, "Y", "phenotypic",input$modtype, input$trait_col, 
                                    gid_col = input$gid_col, eid_col = input$eid_col,
                                    uid_col = input$uid_col)
-    }else{
+    }else if(input$modtype=="Combining ability"){
       config <- create_omic_config(input$y_file, "Y", "phenotypic",input$modtype, input$trait_col, 
                                    gid_col = input$gid_col,g1id_col = input$g1id_col, g2id_col = input$g2id_col, eid_col = input$eid_col,
+                                   uid_col = input$uid_col)
+    }else{
+      config <- create_omic_config(input$y_file, "Y", "phenotypic",input$modtype, input$trait_col, 
+                                   gid_col = input$gid_col,hostid_col = input$hostid_col, patid_col = input$patid_col,
                                    uid_col = input$uid_col)
     }
     
@@ -246,7 +283,7 @@ server <- function(input, output, session) {
           curr_table <- table_data()
           updated_table <- update_table(curr_table, curr_data[[curr_omic$label]])
           table_data(updated_table)
-        }}else{
+        }}else if(input$modtype=="Combining ability"){
           for (omic in c("E","L","L1","L2")) {
             
             if(omic == "E") {
@@ -292,7 +329,46 @@ server <- function(input, output, session) {
             curr_table <- table_data()
             updated_table <- update_table(curr_table, curr_data[[curr_omic$label]])
             table_data(updated_table)
-          }}
+          }}else{
+          for (omic in c("HP","H","P")) {
+            if(omic == "HP") {
+              data_type = "HP IDs"
+              link = "HP ID"
+              id_col = input$gid_col
+              uid_col=input$uid_col
+            } 
+            if (omic == "H"){
+              data_type = "Host IDs"
+              link = "Host ID"
+              id_col = input$hostid_col
+              uid_col=input$uid_col
+            } 
+            if (omic == "P") {
+              data_type = "Pathogen IDs"
+              link = "Pathogen ID"
+              id_col = input$patid_col
+              uid_col=input$uid_col
+            }
+            
+            # Get config for ID column
+            curr_omic <- create_omic_config(input$y_file, omic, data_type,input$modtype,id_col,
+                                            link = link, uid_col=uid_col)
+            
+            # Load data as data.frame for that respective column
+            curr_omic$data <- config$data[, id_col, drop=FALSE]
+            
+            if(!is.na(uid_col)){
+              curr_omic$uid<- config$data[, uid_col,drop=FALSE]
+            }
+            
+            curr_data[[curr_omic$label]] <- curr_omic
+            
+            # Add omic to preview table
+            curr_table <- table_data()
+            updated_table <- update_table(curr_table, curr_data[[curr_omic$label]])
+            table_data(updated_table)
+            } 
+          }
       
       # Save data added for E and L
       data_sources(curr_data)
@@ -332,6 +408,10 @@ server <- function(input, output, session) {
         # Add data to metadata config 
         config$data <- load_data(input$file$datapath)
         
+        if(config$type%in%c("pedigree data","genomic relationship matrix")){
+          colnames(config$data)[-1]<-config$data[,config$id_col]
+        }
+        
         # Grab values from reactive objects
         curr_data <- data_sources()
         curr_types <- data_types()
@@ -365,6 +445,65 @@ server <- function(input, output, session) {
         showNotification("Error: check the data entered in the upload box.", type="error")
         return()
       }
+    }else if(input$modtype=="Combining ability"){
+      if (!input$linkage_type=="Parent Groups ID"){
+        # Create omic metadata object
+        config <- create_omic_config(input$file, input$label, input$data_type,input$modtype, 
+                                     input$id_col, link = input$linkage_type)
+        if(is.null(config)) {
+          showNotification("No file was uploaded, try again.", type="error")
+          return()
+        }
+        
+        if(input$check_data & is.null(input$y_file)){
+          #showNotification("To check data consistency you need to upload phenotype response file (Y).", type="error")
+          return()
+        }
+        
+        verified <- verify_omic_object(config,modtype="Combining ability")
+        
+        if(verified) {
+          
+          # Add data to metadata config 
+          config$data <- load_data(input$file$datapath)
+          
+          if(config$type%in%c("pedigree data","genomic relationship matrix")){
+            colnames(config$data)[-1]<-config$data[,config$id_col]
+          }
+          # Grab values from reactive objects
+          curr_data <- data_sources()
+          curr_types <- data_types()
+          curr_table <- table_data()
+          
+          # New omic type, register and increment file counter
+          if (!config$type %in% curr_types) {
+            file_counter(file_counter() + 1)
+            data_types(c(curr_types, config$type))
+          }
+          
+          # Check if the label already exists and remove the corresponding row
+          existing_label_idx <- which(curr_table$Label == config$label)
+          if (length(existing_label_idx) > 0) {
+            curr_table <- curr_table[-existing_label_idx, ]
+          }
+          
+          # Add omic with data to available data sources
+          curr_data[[config$label]] <- config
+          data_sources(curr_data)
+          
+          # Add omic to preview table
+          updated_table <- update_table(curr_table, curr_data[[config$label]])
+          table_data(updated_table)
+          
+          # Update avalable omics in model assembly page
+          updateSelectInput(session, "omics_labels", choices = names(data_sources()))
+          showNotification("Data was successfully uploaded!", type="message")
+          
+        } else {
+          showNotification("Error: check the data entered in the upload box.", type="error")
+          return()
+        }
+      }
     }else{
       if (!input$linkage_type=="Parent Groups ID"){
         # Create omic metadata object
@@ -380,7 +519,7 @@ server <- function(input, output, session) {
           return()
         }
         
-        verified <- verify_omic_object(config)
+        verified <- verify_omic_object(config,modtype="Host Pathogen")
         
         if(verified) {
           
@@ -420,22 +559,23 @@ server <- function(input, output, session) {
           showNotification("Error: check the data entered in the upload box.", type="error")
           return()
         }
-      }
+      } 
     }
+
   })
   
   # Duplicate omic in case of combining ability model with one genomic marker information for both groups
   observeEvent(input$upload, {
-    if(!input$modtype=="Genotype level"){
+    if(input$modtype=="Combining ability"){
       if (input$linkage_type=="Parent Groups ID"){
         for(omic in c(paste(input$label,"1",sep=""),paste(input$label,"2",sep=""))){
           if (omic == paste(input$label,"1",sep="")) {
-            data_type = "genomic markers"
+            data_type = input$data_type
             link = "Parent Group 1 ID"
             id_col = input$id_col
           }
           if (omic == paste(input$label,"2",sep="")) {
-            data_type = "genomic markers"
+            data_type = input$data_type
             link = "Parent Group 2 ID"
             id_col = input$id_col
           }
@@ -454,11 +594,15 @@ server <- function(input, output, session) {
             return()
           }
           
-          verified <- verify_omic_object(config)
+          verified <- verify_omic_object(config,modtype="Combining ability")
           if(verified) {
             
             # Add data to metadata config 
             config$data <- load_data(input$file$datapath)
+            
+            if(config$type%in%c("pedigree data","genomic relationship matrix")){
+              colnames(config$data)[-1]<-config$data[,config$id_col]
+            }
             
             # Grab values from reactive objects
             curr_data <- data_sources()
@@ -541,7 +685,7 @@ server <- function(input, output, session) {
           data_sources(update_data_sources)
           showNotification("Data was successfully checked!", type="message")
         }
-      }else{ # Check at parent level
+      }else if(input$modtype=="Combining ability"){ # Check at parent level
         
         update_data_sources<-data_sources()
         if(input$linkage_type=="Parent Group 1 ID"){
@@ -570,6 +714,28 @@ server <- function(input, output, session) {
           data_sources(update_data_sources)
           showNotification("Data was successfully checked!", type="message")
         }
+      }else{
+        update_data_sources<-data_sources()
+        if(input$linkage_type=="Host ID"){
+          ids<-data_sources()[["H"]]$data[,1]
+          update_data_sources[[input$label]]$data <- update_data_sources[[input$label]]$data[update_data_sources[[input$label]]$data[[input$id_col]] %in% ids, ]
+        }
+        else if(input$linkage_type=="Pathogen ID"){
+          ids<-data_sources()[["P"]]$data[,1]
+          update_data_sources[[input$label]]$data <- update_data_sources[[input$label]]$data[update_data_sources[[input$label]]$data[[input$id_col]] %in% ids, ]
+        }
+        
+        else if(input$linkage_type=="Compound ID / UID"){
+          ids<-c(data_sources()[["HP"]]$uid[,1],data_sources()[["HP"]]$uid[,1])
+          update_data_sources[[input$label]]$data <- update_data_sources[[input$label]]$data[update_data_sources[[input$label]]$data[[input$id_col]] %in% ids, ]
+          
+        }
+        if (nrow(update_data_sources[[length(update_data_sources)]]$data)<=0 ){
+          showNotification("Please check omic ID column and/or linkage type.", type="error")
+        }else{
+          data_sources(update_data_sources)
+          showNotification("Data was successfully checked!", type="message")
+        }  
       }
       }
     }
@@ -895,7 +1061,7 @@ server <- function(input, output, session) {
     
     ### 4/6 -- Preparing data for cross-validation ###
     logging(session, "Step [4/6] Assigning folds for cross validation")
-    cv_ids <- prep_data_for_cv(ydata, folds, cv1, cv2, cv0, cv00)
+    cv_ids <- prep_data_for_cv(ydata, folds, cv1, cv2, cv0, cv00,seed)
     #write.csv(cv_ids,file="cv_ids.csv",row.names=F)
     # Get terms to add as column names
     all_terms <- sapply(model_equation, function(x) paste(x, collapse="_"))

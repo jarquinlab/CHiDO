@@ -172,11 +172,11 @@ create_g_matrix <- function(o_data, y_data, wht=FALSE, ctr=FALSE, std=FALSE,
     if (type %in% c("genomic markers")) {
       data <- filter_markers(data, nan_freq)
     }
-    
+
     O <- as.matrix(data[,-id_col])
     rownames(O) <- data[[id_col]]
     
-    if (type != "pedigree") {
+    if (!type %in% c("pedigree data","genomic relationship matrix")) {
       # Do the processing for data to reach initial G
       s <- 0
       GO <- pre_process_data(O, type, s, wht, ctr, std, prop_maf_j)
@@ -196,9 +196,17 @@ create_g_matrix <- function(o_data, y_data, wht=FALSE, ctr=FALSE, std=FALSE,
       Z <- Matrix(model.matrix(~ids - 1),sparse=TRUE)
       GO <- tcrossprod(Z, GO)
       
-    } else {
+    } else if(type=="pedigree data"){
       # Initial O matrix for pedigree data
+      O <- O[ rownames(O) %in% unique(ids)  ,  colnames(O) %in% unique(ids) ]
+      ids <- factor(ids, levels = rownames(O))
+      Z <- Matrix(model.matrix(~ids - 1),sparse=TRUE)
       GO <- tcrossprod(Z, 2*as.matrix(O))
+    }else{
+      O <- O[ rownames(O) %in% unique(ids)  ,  colnames(O) %in% unique(ids) ]
+      ids <- factor(ids, levels = rownames(O))
+      Z <- Matrix(model.matrix(~ids - 1),sparse=TRUE)
+      GO <- tcrossprod(Z, as.matrix(O))
     }
     
     G <- tcrossprod(GO, Z)
@@ -289,8 +297,8 @@ get_evd_plots <- function(EVD, out_path) {
 }
 
 # Assign individuals to respective folds based on CV technique
-prep_data_for_cv <- function(y_data, folds, cv1, cv2, cv0, cv00) {
-  
+prep_data_for_cv <- function(y_data, folds, cv1, cv2, cv0, cv00,seed=NULL) {
+  set.seed(seed)
   data <- y_data$data
   gid <- y_data$gid_col
   eid <- y_data$eid_col
@@ -502,6 +510,7 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
       
       predictions <- rbind(predictions, preds)
     }
+    predictions<-predictions[!duplicated(predictions$testing),]
   }
   
   if (cv %in% c("cv0")) {

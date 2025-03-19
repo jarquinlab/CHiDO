@@ -54,8 +54,10 @@ data_view_instructions <- "To view the data you have uploaded for this session,
 omic_types_gen <- c("genomic markers", "phenomic markers", "environmental markers",
                 "pedigree data", "high-throughput data", "other")
 
-omic_types_cga <- c("genomic markers", "phenomic markers", "environmental markers",
+omic_types_cga <- c("genomic markers","genomic relationship matrix", "phenomic markers", "environmental markers",
                 "pedigree data", "high-throughput data", "other")
+
+omic_types_hp<-c("genomic markers","phenomic markers","pedigree data","high-throughput data","other")
 
 # Upload phenotypic response file box
 upload_y_box <- box(
@@ -64,6 +66,7 @@ upload_y_box <- box(
   fileInput("y_file", "Upload phenotype response (Y) file:", multiple=FALSE),
   tags$div(style="position: relative; top: -20px;",
   radioButtons(inputId="modtype",label="Select model type:",choices=c("Genotype level", "Combining ability"),selected="Genotype level",inline=T)),
+  #radioButtons(inputId="modtype",label="Select model type:",choices=c("Genotype level", "Combining ability","Host-Pathogen"),selected="Genotype level",inline=T)),
   uiOutput("y_panel"),
   tags$hr(class="separator"),
   # Upload button

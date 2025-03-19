@@ -28,7 +28,7 @@ There is a demo version of CHiDO hosted as a free web application at:
 The following packages, listed in `requirements.txt`, are necessary to
 run CHiDO locally: - shiny - shinyjs - shinyjqui - shinydashboard -
 dplyr - ggplot2 - viridis - scales - gridExtra - DT - zip - markdown -
-BGLR
+BGLR - Matrix - lme4 - mvtnorm - rstiefel - tmvtnorm 
 
 Once you clone/download the repository, ensure you are in the CHiDO
 directory and run the following command in the terminal:
@@ -89,7 +89,7 @@ menu will be displayed where you can select how the ID column should be linked b
 
 The __combining ability__ model is intended for hybrid modeling. In this case, users can upload omics data specifically for each parental group. 
 For example, the genomic marker matrices where available genotypic information corresponds to the parents of phenotyped individuals, can be uploaded for each of the parental groups __(Parent Group 1 ID and Parent Group 2 ID)__, or for both groups using an unique genomic marker matrix containing males and females genotypes __(Parents Groups ID)__.
-IDs should corresponds to the chosen option in a single linkage column.
+The user can also provide a unique Genomic Kinship Matrix containing both parent groups instead of entering the molecular marker information __(genomic relationship matrix as data type)__. instead of molecular information. IDs should corresponds to the chosen option in a single linkage column.
 
 
 - __Check data consistency__ function will remove those rows whose ID in the omic data are absent in the phenotypic file following the linkage columns.

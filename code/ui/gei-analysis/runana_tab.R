@@ -25,7 +25,7 @@ source("code/functions/utils.R")
 ### UI instructions ----
 
 ruana_instructions <- "With the data you have uploaded, you can begin performing
-  the following analyses: Bayesian AMMI (Crossa et al., 2011) and Bayesian weighted average of absolute scores including or no the response variable (BWAAS and BWAASY) (Olivoto et al., 2019; Nascimento et al., 2025). 
+  the following analyses: Bayesian AMMI (Crossa et al., 2011) and Bayesian weighted average of absolute scores including or no the response variable (BWAAS and BWAASY) (Olivoto et al., 2019; Nascimento et al., 2025 under revision). 
   Customize the hyperparameters as necessary. The settings do not reset once the analyses
   are completed, so please re-adjust if you want to use different configurations."
 

@@ -49,7 +49,7 @@ load_data <- function(path = NULL) {
 
 # Create omic metadata list, no actual omic data is attached yet
 create_omic_config <- function(file, label, data_type,modtype, id_col, gid_col = NULL,
-                               g1id_col = NULL, g2id_col = NULL,eid_col = NULL, uid_col=NULL, link = NULL) {
+                               g1id_col = NULL, g2id_col = NULL,hostid_col=NULL,patid_col=NULL,eid_col = NULL, uid_col=NULL, link = NULL) {
   if(!is.null(file)) {
     
     config <- list(
@@ -64,12 +64,19 @@ create_omic_config <- function(file, label, data_type,modtype, id_col, gid_col =
       config$gid_col <- as.integer(gid_col)
       config$eid_col <- as.integer(eid_col)
       config$uid_col <- as.integer(uid_col)
-      }else{
+      }else if(modtype=="Combining ability"){
       config$trait_col <- as.integer(id_col)
       config$gid_col <- as.integer(gid_col)
       config$g1id_col <- as.integer(g1id_col)
       config$g2id_col <- as.integer(g2id_col)
       config$eid_col <- as.integer(eid_col)
+      config$uid_col <- as.integer(uid_col)
+      }else{
+      config$trait_col <- as.integer(id_col)
+      config$gid_col <- as.integer(gid_col)
+      config$hostid_col <- as.integer(hostid_col)
+      config$patid_col <- as.integer(patid_col)
+      #config$eid_col <- as.integer(eid_col)
       config$uid_col <- as.integer(uid_col)
       }
     } else {
@@ -82,7 +89,7 @@ create_omic_config <- function(file, label, data_type,modtype, id_col, gid_col =
       } else {
         linkage_type = link
       }}else{
-        if (tolower(data_type) %in% c("genomic markers", "pedigree data", "phenomic markers")) {
+        if (tolower(data_type) %in% c("genomic markers", "genomic relationship matrix","pedigree data", "phenomic markers")) {
           linkage_type = link
         } 
           else if (tolower(data_type) == "environmental markers") {
@@ -110,8 +117,10 @@ verify_omic_object <- function(config, phen = FALSE, modtype="Genotype level") {
   if(phen) {         # Data is from phenotype response (Y) file
     if(modtype=="Genotype level"){
     req_fields <- c("gid_col", "eid_col", "trait_col")
-    }else{
+    }else if(modtype=="Combining ability"){
     req_fields <- c("gid_col","g1id_col","g2id_col", "eid_col", "trait_col") 
+    }else{
+    req_fields <- c("gid_col","hostid_col","patid_col", "trait_col") 
     }
   } else {           # Data is from another (X) omic file (e.g. markers)
     req_fields <- c("label", "id_col")
