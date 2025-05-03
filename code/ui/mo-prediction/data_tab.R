@@ -65,8 +65,7 @@ upload_y_box <- box(
   class = "upload-box",
   fileInput("y_file", "Upload phenotype response (Y) file:", multiple=FALSE),
   tags$div(style="position: relative; top: -20px;",
-  radioButtons(inputId="modtype",label="Select model type:",choices=c("Genotype level", "Combining ability"),selected="Genotype level",inline=T)),
-  #radioButtons(inputId="modtype",label="Select model type:",choices=c("Genotype level", "Combining ability","Host-Pathogen"),selected="Genotype level",inline=T)),
+  radioButtons(inputId="modtype",label="Select model type:",choices=c("Genotype level", "Combining ability","Host-Pathogen"),selected="Genotype level",inline=T)),
   uiOutput("y_panel"),
   tags$hr(class="separator"),
   # Upload button

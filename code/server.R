@@ -91,10 +91,10 @@ server <- function(input, output, session) {
                  create_input_box("Individual ID (UID) column:", "uid_col"),
                  create_input_box("*Target trait column:", "trait_col", 5))
     }else{
-      panel<-div(create_input_box('*Host-pathogen ID column:', "gid_col", 1),
-                 create_input_box('*Host ID column:', "hostid_col", 2),
+      panel<-div(create_input_box('*Host-pathogen ID column:', "hostpatid_col", 1),
+                 create_input_box('*Host ID column:', "gid_col", 2),
                  create_input_box('*Pathogen ID column:', "patid_col", 3),
-                 #create_input_box("*Environment ID column:", "eid_col", 4),
+                 create_input_box("Environment ID column:", "eid_col"),
                  create_input_box("Individual ID (UID) column:", "uid_col"),
                  create_input_box("*Target trait column:", "trait_col", 5))
     }
@@ -232,8 +232,8 @@ server <- function(input, output, session) {
                                    uid_col = input$uid_col)
     }else{
       config <- create_omic_config(input$y_file, "Y", "phenotypic",input$modtype, input$trait_col, 
-                                   gid_col = input$gid_col,hostid_col = input$hostid_col, patid_col = input$patid_col,
-                                   uid_col = input$uid_col)
+                                   gid_col = input$gid_col,hostpatid_col = input$hostpatid_col, patid_col = input$patid_col,
+                                   eid_col=input$eid_col,uid_col = input$uid_col)
     }
     
     if(is.null(config)) {
@@ -248,8 +248,18 @@ server <- function(input, output, session) {
       # Add data to metadata config 
       config$data <- load_data(input$y_file$datapath)
       
+      # Add column to single environment in HP model
+      if(is.na(input$eid_col)){config$data[,ncol(config$data)+1]<-rep(1,times=nrow(config$data))
+      config$eid_col=as.integer(ncol(config$data))
+      disable("cv0")
+      disable("cv00")}
+      else{
+      enable("cv0")
+      enable("cv00")
+      }
+      
       # Grab values from reactive objects
-      phen_data(config)
+      #phen_data(config)
       curr_data <- data_sources()
       
       if (input$modtype=="Genotype level"){
@@ -330,17 +340,17 @@ server <- function(input, output, session) {
             updated_table <- update_table(curr_table, curr_data[[curr_omic$label]])
             table_data(updated_table)
           }}else{
-          for (omic in c("HP","H","P")) {
+          for (omic in c("HP","H","P","E")) {
             if(omic == "HP") {
               data_type = "HP IDs"
               link = "HP ID"
-              id_col = input$gid_col
+              id_col = input$hostpatid_col
               uid_col=input$uid_col
             } 
             if (omic == "H"){
               data_type = "Host IDs"
               link = "Host ID"
-              id_col = input$hostid_col
+              id_col = input$gid_col
               uid_col=input$uid_col
             } 
             if (omic == "P") {
@@ -348,6 +358,18 @@ server <- function(input, output, session) {
               link = "Pathogen ID"
               id_col = input$patid_col
               uid_col=input$uid_col
+            }
+            if (omic == "E") {
+              if(is.na(input$eid_col)){
+              data_type = "Environment IDs"
+              link = "Environment ID"
+              id_col = ncol(config$data)
+              uid_col=input$uid_col
+              }else{
+              data_type = "Environment IDs"
+              link = "Environment ID"
+              id_col = input$eid_col
+              uid_col=input$uid_col}
             }
             
             # Get config for ID column
@@ -367,11 +389,13 @@ server <- function(input, output, session) {
             curr_table <- table_data()
             updated_table <- update_table(curr_table, curr_data[[curr_omic$label]])
             table_data(updated_table)
-            } 
+          } 
+          
           }
       
       # Save data added for E and L
       data_sources(curr_data)
+      phen_data(config)
       # Update avalable omics in model assembly page
       updateSelectInput(session, "omics_labels", choices = names(data_sources()))
       showNotification("Data was successfully uploaded!", type="message")
@@ -385,6 +409,12 @@ server <- function(input, output, session) {
   
   # Add omics data to session
   observeEvent(input$upload, {
+    label_names<-names(data_sources())
+    if(input$label %in% label_names) {
+      showNotification("Please provide an alternative label for the omic data, as the one you suggested already exists.", type="error")
+      return()
+    }
+    
     if (input$modtype=="Genotype level"){
       
       # Create omic metadata object
@@ -519,7 +549,7 @@ server <- function(input, output, session) {
           return()
         }
         
-        verified <- verify_omic_object(config,modtype="Host Pathogen")
+        verified <- verify_omic_object(config,modtype="Host-Pathogen")
         
         if(verified) {
           
@@ -645,6 +675,10 @@ server <- function(input, output, session) {
   
   # set function to check data consistency
   observeEvent(input$upload, {
+    if(input$label %in% names(data_sources())) {
+      #showNotification("Please provide an alternative label for the omic data, as the one you suggested already exists.", type="error")
+      return()
+    }
     
     if(input$check_data){ # Only works when check box is TRUE
       if(is.null(input$y_file)){
@@ -671,7 +705,7 @@ server <- function(input, output, session) {
         # Function to check genotypes
         update_data_sources<-data_sources()
         
-        if(data_sources()[["L"]]$linkage_type=="Compound ID / UID"){
+        if(input$linkage_type=="Compound ID / UID"){
         ids<-data_sources()[["L"]]$uid[,1]
         }else{
         ids<-data_sources()[["L"]]$data[,1]
@@ -983,6 +1017,7 @@ server <- function(input, output, session) {
     
     # Data for training/testing
     ds <- data_sources()
+    
     # Separate Y data from the rest
     ydata <- phen_data()
     # Get unique list of labels
@@ -1014,7 +1049,7 @@ server <- function(input, output, session) {
       result <- create_g_matrix(curr_term, ydata, wht, ctr, std, nan_freq, prop_maf_j)
       G <- result[["G"]]
       EVD <- result[["EVD"]]
-      print(dim(G))
+      print(G[1:5,1:5])
       print(dim(EVD$vectors))
       # Save the results as RDA files
       logging(session, paste0("4 ==> Saving results for: ", label))
@@ -1061,6 +1096,7 @@ server <- function(input, output, session) {
     
     ### 4/6 -- Preparing data for cross-validation ###
     logging(session, "Step [4/6] Assigning folds for cross validation")
+    
     cv_ids <- prep_data_for_cv(ydata, folds, cv1, cv2, cv0, cv00,seed)
     #write.csv(cv_ids,file="cv_ids.csv",row.names=F)
     # Get terms to add as column names
@@ -1078,8 +1114,8 @@ server <- function(input, output, session) {
     
     if (cv00) { 
       logging(session, "CV00")
-      cv1_preds <- get_predictions(cv_ids, tmpdir, model_selected, all_terms, "cv00", 
-                                   folds, nIter=nIter, burnIn=burnIn)
+      cv1_preds <- suppressWarnings(get_predictions(cv_ids, tmpdir, model_selected, all_terms, "cv00", 
+                                   folds, nIter=nIter, burnIn=burnIn))
     }
     if (cv1) { 
       logging(session, "CV1")
@@ -1105,6 +1141,7 @@ server <- function(input, output, session) {
                     burnIn=burnIn, cv=NULL)
     
     ### Create visualizations ###
+    if(any(sapply(list(cv1,cv2,cv0,cv00), isTRUE))){
     logging(session, "Calculating evaluation metrics: ")
     get_model_accuracy(3, file.path(tmpdir,"output"), FALSE)
     get_model_accuracy(3, file.path(tmpdir,"output"), TRUE)
@@ -1112,6 +1149,7 @@ server <- function(input, output, session) {
     get_model_rmse(3, file.path(tmpdir,"output"), FALSE)
     get_model_rmse(3, file.path(tmpdir,"output"), TRUE)
     logging(session, "==> RMSE")
+    }
     get_model_varcomps(file.path(tmpdir,"output"))
     logging(session, "==> Variance components")
     

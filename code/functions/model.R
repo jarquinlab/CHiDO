@@ -49,6 +49,12 @@ get_join_id <- function(curr_term, y_data) {
     return(y_data$g2id_col)
   } else if(curr_term$linkage_type == "Compound ID / UID") {
     return(y_data$uid_col)
+  }else if(curr_term$linkage_type == "HP ID") {
+    return(y_data$hostpatid_col)
+  }else if(curr_term$linkage_type == "Host ID") {
+    return(y_data$gid_col)
+  }else if(curr_term$linkage_type == "Pathogen ID") {
+    return(y_data$patid_col)
   }
   }
 
@@ -149,10 +155,11 @@ create_g_matrix <- function(o_data, y_data, wht=FALSE, ctr=FALSE, std=FALSE,
   join_id <- o_data$y_col
 
   ids <- factor(y_data$data[, join_id])
+  print(ids[1:5])
   Z <- Matrix(model.matrix(~ids - 1),sparse=TRUE)
 
   # No data, create G from Y values only
-  if (is.null(data) || o_data$label %in% c("E","L","L1","L2")) {
+  if (is.null(data) || o_data$label %in% c("E","L","L1","L2","HP","H","P")) {
     
     d <- colSums(Z)
     #V <- Z / sqrt(d)
@@ -372,15 +379,14 @@ prep_data_for_cv <- function(y_data, folds, cv1, cv2, cv0, cv00,seed=NULL) {
     foldscv00<-length(unique(retdf$cv0))*length(unique(retdf$cv1))
     y_cv00<-matrix(NA,nrow=dim(data),ncol=length(unique(retdf$cv0)))
     y_cv00[,] <- data[,trait_col]
-    
+
     for(fold in 1:length(unique(retdf$cv0)))
     {
       y_cv00[retdf$cv0==fold,fold] <- NA
     }
-    
-    y_cv00 <- do.call(cbind, lapply(1:ncol(y_cv00), function(i) matrix(rep(y_cv00[, i], length(unique(retdf$cv1))), ncol=length(unique(retdf$cv1)))))
+    y_cv00 <- do.call(cbind, lapply(1:ncol(y_cv00), function(i) matrix(rep(y_cv00[, i], length(unique(retdf$cv1))),nrow=nrow(y_cv00), ncol=length(unique(retdf$cv1)))))
     colnames(y_cv00) <- paste0(colnames(data)[trait_col],"_cv00_fold_",1:(foldscv00))
-    
+
     for (i in seq(1,ncol(y_cv00),by=length(unique(retdf$cv1)))) {
       
     for (j in 1:length(unique(retdf$cv0))){
@@ -391,7 +397,8 @@ prep_data_for_cv <- function(y_data, folds, cv1, cv2, cv0, cv00,seed=NULL) {
     }
     }
     retdf <- cbind(retdf, y_cv00)
-  }
+
+    }
   return(retdf)
   
 }
@@ -471,7 +478,7 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
   eid <- data[, 2]          # Environment IDs
   gid <- data[, 1]          # Line IDs
   eids<- unique(eid)
-
+  
   if (cv %in% c("cv00")) {
 
     idcv00<-list()
@@ -549,7 +556,7 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
         y_na[testing] <- NA
         
         # Fit BGLR model
-        fm <- BGLR(y=y_na, ETA = eta, nIter=nIter, burnIn=burnIn, verbose=TRUE)
+        fm <- BGLR(y=y_na, ETA = eta, nIter=nIter, burnIn=burnIn, verbose=FALSE)
         
         # Generate predictions
         

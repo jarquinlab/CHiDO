@@ -1,0 +1,3 @@
+Reference to data source: Using genome-wide associations and host-by-pathogen predictions to identify allelic interactions that control disease resistance.
+
+access at: https://acsess.onlinelibrary.wiley.com/doi/full/10.1002/tpg2.70006

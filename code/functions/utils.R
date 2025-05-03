@@ -59,7 +59,8 @@ create_panel <- function(data_type, label) {
 get_num_fields_from_list <- function(config) {
   return(names(config)[sapply(config, function(x) is.numeric(x) && 
                                 !is.null(x) && 
-                                !is.na(x))]
+                                !is.na(x)&&
+                                !length(x)==0)]
   )
 }
 
