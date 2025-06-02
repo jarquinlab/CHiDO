@@ -24,6 +24,7 @@ source("code/ui/mo-prediction/data_tab.R")
 source("code/ui/mo-prediction/model_tab.R")
 source("code/ui/mo-prediction/cv_tab.R")
 source("code/ui/mo-prediction/results_tab.R")
+source("code/ui/mo-prediction/predict_tab.R")
 source("code/ui/gei-analysis/gei_data_tab.R")
 source("code/ui/gei-analysis/runana_tab.R")
 source("code/ui/gei-analysis/gei_results_tab.R")
@@ -44,6 +45,7 @@ body <- dashboardBody(
     model_tab,
     cv_tab,
     results_tab,
+    predict_tab,
     gei_data_tab,
     runana_tab,
     gei_results_tab,
@@ -58,7 +60,9 @@ sidebar <- dashboardSidebar(
              menuSubItem("Upload Data", tabName="data", icon = icon("arrow-right")),
              menuSubItem("Create Model(s)", tabName="model", icon = icon("arrow-right")),
              menuSubItem("Train/Validate Model(s)", tabName="validate", icon=icon("arrow-right")),
-             menuSubItem("View CV results", tabName="results", icon = icon("arrow-right"))),
+             menuSubItem("View CV results", tabName="results", icon = icon("arrow-right")),
+             menuSubItem("Predict New Phenotypes", tabName="predict", icon = icon("arrow-right"))
+             ),
    
     menuItem("GEI Analysis", tabName="gei",startExpanded = FALSE,
       menuSubItem("Upload Data", tabName="gei_data", icon = icon("arrow-right")),
@@ -80,5 +84,3 @@ ui <- dashboardPage(
   sidebar,
   body
 )
-
-

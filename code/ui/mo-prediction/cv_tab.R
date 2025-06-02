@@ -86,7 +86,7 @@ cv_box <- fluidRow(
     h3("Cross-validation", class="tab-header"),
     column(
       12,
-      selectInput("saved_models", "Select a model:", choices=NULL, width="100%"),
+      selectInput("cv_model", "Select a model:", choices=NULL, width="100%"),
       div(style="padding: 5px;", fluidRow(
         column(4,
                tags$b("Select desired CV scheme(s):"),

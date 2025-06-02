@@ -32,12 +32,7 @@ library(gridExtra)
 ### Loading source files ----
 
 # Import functions for server
-source("code/functions/utils.R")
-source("code/functions/data.R")
-source("code/functions/model.R")
-source("code/functions/metrics.R")
-source("code/functions/gei_model.R")
-source("code/functions/gei_metrics.R")
+lapply(dir("code/functions", full.names = TRUE), source)
 
 create_temp_dir <- function() {
   tmpdir <- tempdir()
@@ -58,6 +53,7 @@ server <- function(input, output, session) {
   # Reactive variables to maintain sesssion
   phen_data <- reactiveVal(list())
   data_sources <- reactiveVal(list())
+  data_sources2 <- reactiveVal(list())
   omics_labels <- reactiveVal(list())
   data_types <- reactiveVal(list())
   file_counter <- reactiveVal(0)
@@ -414,7 +410,6 @@ server <- function(input, output, session) {
       showNotification("Please provide an alternative label for the omic data, as the one you suggested already exists.", type="error")
       return()
     }
-    
     if (input$modtype=="Genotype level"){
       
       # Create omic metadata object
@@ -948,21 +943,21 @@ server <- function(input, output, session) {
       removeModal()
       
       # Update models available for validation
-      updateSelectInput(session, "saved_models", choices = names(saved_models()))
+      updateSelectInput(session, "cv_model", choices = names(saved_models()))
+      updateSelectInput(session, "predict_model", choices = c('',names(saved_models())))
       
       showNotification(paste0(input$saved_model, " was successfully saved!"),
                        type = "message")
     }
   })
-  
   ### Train / validate tab ----
   
   # Update available models
-  output$saved_models <- renderUI({
-    selectInput("saved_models",
-                "Select a saved model",
-                choices = names(saved_models()))
-  })
+  # output$saved_models <- renderUI({
+  #   selectInput("saved_models",
+  #               "Select a saved model",
+  #               choices = names(saved_models()))
+  # })
   
   # Update and sync the slider and input fields for hyperparameters
   observeEvent(input$n_iter_input, {
@@ -988,7 +983,7 @@ server <- function(input, output, session) {
     logging(session, "[Step 1/6] Checking parameters.")
     
     # Get the model selected
-    model_selected <- input$saved_models
+    model_selected <- input$cv_model
     model_equation <- lapply(saved_models()[[model_selected]], reformat_model)
     
     logging(session, paste0("Model selected: ", model_selected))
@@ -1261,6 +1256,65 @@ server <- function(input, output, session) {
       imageOutput("plot")
     } else {
       renderText("No plots available yet")
+    }
+  })
+  
+  ### Predict New Phenotypes tab ----
+  
+  output$pred_y_panel<-renderUI({
+    if (input$predtype%in%"Customized"){
+      panel<-div(fileInput("pred_y_file", "Upload the phenotypes you wish to predict:", multiple=FALSE),
+                 create_input_box("GID column:", "gid_col2", 1),
+                 create_input_box("EID column:", "eid_col2", 2),
+                 create_input_box("UID column:", "uid_col2", 3))
+    }
+  })
+  
+  observeEvent(input$predict_model, {
+    req(input$tabs == "predict")  
+    disable("run_predictions")
+    if (!is.null(input$predict_model) && input$predict_model != "") {
+      model_selected <- input$predict_model
+      showNotification(sprintf("%s will be used for prediction", model_selected),
+                       type = "message")
+      model_equation <- lapply(saved_models()[[model_selected]], reformat_model)
+      model_omics <- extract_omics(saved_models()[[model_selected]])
+      current_omics <- names(data_sources2())
+      updateSelectInput(session, "omics_new_features", choices = model_omics)
+      if (all(model_omics %in% current_omics)){
+        enable("run_predictions")
+        }else{
+      showNotification(
+        sprintf("Missing omics for prediction: %s", paste(setdiff(model_omics, current_omics), collapse = ", ")),
+        type = "warning")
+    }
+  }
+  })
+  
+  output$data_panel2<-renderUI({
+    if (input$omics_new_features != ''){
+      if (data_sources()[[input$omics_new_features]]$linkage_type %in% "Genotype / Line ID"){
+        panel<-div(create_input_box("GID column:", "feat_id_col", 1))
+      }else if (data_sources()[[input$omics_new_features]]$linkage_type %in% "Environment ID"){
+        panel<-div(create_input_box("EID column:", "feat_id_col", 1))
+      }else{
+        panel<-div(create_input_box("UID column:", "feat_id_col", 1))
+      }
+    }
+  })
+
+  
+  observeEvent(input$feature_upload_btn, {
+    req(input$feature_file, input$omics_new_features)
+    new_df <- read.csv(input$feature_file$datapath)
+    current <- data_sources2()
+    current[[input$omics_new_features]] <- new_df
+    data_sources2(current)
+    model_selected <- input$predict_model
+    model_omics <- extract_omics(saved_models()[[model_selected]])
+    current_omics <- names(data_sources2())
+    if (all(model_omics %in% current_omics)){
+      enable("run_predictions")
     }
   })
   
