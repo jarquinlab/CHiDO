@@ -53,7 +53,6 @@ server <- function(input, output, session) {
   # Reactive variables to maintain sesssion
   phen_data <- reactiveVal(list())
   data_sources <- reactiveVal(list())
-  data_sources2 <- reactiveVal(list())
   omics_labels <- reactiveVal(list())
   data_types <- reactiveVal(list())
   file_counter <- reactiveVal(0)
@@ -66,6 +65,14 @@ server <- function(input, output, session) {
     Type = character(),
     ID = numeric(),
     Linkage = character(),
+    stringsAsFactors = FALSE
+  ))
+  # Reactive variables for predict tab 
+  data_sources2 <- reactiveVal(list())
+  predict_prompt <- reactiveVal(data.frame(
+    GID = character(),
+    EID = character(),
+    UID = character(),
     stringsAsFactors = FALSE
   ))
   
@@ -1260,15 +1267,26 @@ server <- function(input, output, session) {
   })
   
   ### Predict New Phenotypes tab ----
-  
-  output$pred_y_panel<-renderUI({
-    if (input$predtype%in%"Customized"){
-      panel<-div(fileInput("pred_y_file", "Upload the phenotypes you wish to predict:", multiple=FALSE),
-                 create_input_box("GID column:", "gid_col2", 1),
-                 create_input_box("EID column:", "eid_col2", 2),
-                 create_input_box("UID column:", "uid_col2", 3))
-    }
+  observeEvent(input$pred_y_load, {
+    req(input$pred_y_file)
+    req(input$gid_col2, input$eid_col2, input$uid_col2)
+    
+    df <- read.csv(input$pred_y_file$datapath, stringsAsFactors = FALSE)
+    req(all(c(input$gid_col2, input$eid_col2, input$uid_col2) <= ncol(df)))
+    
+    predict_prompt(data.frame(
+      EID = df[[input$eid_col2]],
+      GID = df[[input$gid_col2]],
+      UID = df[[input$uid_col2]],
+      stringsAsFactors = FALSE
+    ))
+    
+    showNotification(paste("Loaded predict_prompt with", 
+                           nrow(predict_prompt()), "rows and", 
+                           ncol(predict_prompt()), "columns."), 
+                     type = "message")
   })
+  
   
   observeEvent(input$predict_model, {
     req(input$tabs == "predict")  
@@ -1303,20 +1321,46 @@ server <- function(input, output, session) {
     }
   })
 
-  
   observeEvent(input$feature_upload_btn, {
-    req(input$feature_file, input$omics_new_features)
-    new_df <- read.csv(input$feature_file$datapath)
+    req(input$feature_file, input$omics_new_features, input$feat_id_col)
+    new_df <- read.csv(input$feature_file$datapath, check.names = FALSE)
+    id_col <- input$feat_id_col
+    req(id_col %in% names(new_df) || (is.numeric(id_col) && id_col <= ncol(new_df)))
+    
+    id_vals <- new_df[[as.integer(id_col)]]
+    new_df <- new_df[ , -as.integer(id_col), drop = FALSE]
+  
+    new_df <- cbind(ID = id_vals, new_df)
     current <- data_sources2()
     current[[input$omics_new_features]] <- new_df
     data_sources2(current)
+
     model_selected <- input$predict_model
     model_omics <- extract_omics(saved_models()[[model_selected]])
     current_omics <- names(data_sources2())
-    if (all(model_omics %in% current_omics)){
+    if (all(model_omics %in% current_omics)) {
       enable("run_predictions")
     }
+    
+    showNotification(paste("Loaded features into data_sources2[['", 
+                           input$omics_new_features, "']] with", 
+                           nrow(new_df), "rows and", 
+                           ncol(new_df), "columns."), 
+                     type = "message")
   })
+  
+  # for development, remove later
+  observeEvent(input$run_predictions, {
+    req(input$run_predictions)
+
+    output <- predict_helper(trn_list = data_sources(), prd_list = data_sources2(),
+                   phen_list = phen_data(), prompt = predict_prompt(),
+                   model = input$predict_model)
+    save(output, file = 'output.RData')
+    
+    showNotification("output saved", type = "message")
+  })
+  
   
   # AMMI and Bayesian indexes (GEI analyses)
   

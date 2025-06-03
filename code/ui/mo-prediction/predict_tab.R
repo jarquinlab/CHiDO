@@ -55,16 +55,12 @@ select_model2 <- box(
 upload_y_box2 <- box(
   width = 6,
   class = "upload-box",
-  radioButtons(inputId="predtype",label="Select a prediction task:",
-               choices=c("Predict New Genotypes (CV1-like)",
-                         "Predict New Environments (CV0-like)",
-                         "Customized"),
-               selected="Predict New Genotypes (CV1-like)",inline=F),
-  uiOutput("pred_y_panel"),
-  tags$hr(class="separator"),
-  # Upload button
-  div(class="action-btn", div(class="btn-contents",
-                              actionButton("new_y_load", "Upload"))
+  panel<-div(fileInput("pred_y_file", "Upload the phenotypes you wish to predict:", multiple=FALSE),
+             create_input_box("EID column:", "eid_col2", 1),
+             create_input_box("GID column:", "gid_col2", 2),
+             create_input_box("UID column:", "uid_col2", 3),
+             div(class="action-btn", div(class="btn-contents",
+                                         actionButton("pred_y_load", "Upload")))
   )
 )
 
