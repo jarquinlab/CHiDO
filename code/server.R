@@ -1349,18 +1349,272 @@ server <- function(input, output, session) {
                      type = "message")
   })
   
-  # for development, remove later
   observeEvent(input$run_predictions, {
     req(input$run_predictions)
 
-    output <- predict_helper(trn_list = data_sources(), prd_list = data_sources2(),
+    predict_ds <- predict_helper(trn_list = data_sources(), prd_list = data_sources2(),
                    phen_list = phen_data(), prompt = predict_prompt(),
                    model = input$predict_model)
-    save(output, file = 'output.RData')
     
-    showNotification("output saved", type = "message")
+    model_selected <- input$predict_model
+    model_equation <- lapply(saved_models()[[model_selected]], reformat_model)
+    
+    # Tuning parameters
+    nIter <- input$n_iter_input
+    burnIn <- input$burn_in_input
+    std <- input$std
+    ctr <- input$ctr
+    wht <- FALSE #input$wht
+    esc <- FALSE #input$esc
+    nan_freq <- input$nan_freq
+    folds <- input$folds
+    prop_maf_j <- input$prop_maf_j
+    seed <- input$set_seed
+    
+    cv1 <- input$cv1
+    cv2 <- input$cv2
+    cv0 <- input$cv0
+    cv00 <- input$cv00
+    
+    ds <- predict_ds$omics_merged
+    ydata <- predict_ds$phen_merged
+    labels <- unique(unlist(model_equation))
+    
+    # Loop through unique matrices to create G matrices
+    for (label in labels) {
+      # Get the ID column shared by omic and Y data
+      curr_term <- ds[[label]]
+      curr_term$y_col <- get_join_id(curr_term, ydata[!names(ydata) %in% "data"])
+      if (is.null(curr_term$y_col)) {
+        showNotification("There is a linkage error between your data, please check your ID columns",
+                         type = "error")
+        return()
+      }
+      
+      result <- create_g_matrix(curr_term, ydata, wht, ctr, std, nan_freq, prop_maf_j)
+      G <- result[["G"]]
+      EVD <- result[["EVD"]]
+
+      outdir <- file.path(tmpdir, label)
+      if (!dir.exists(outdir)) { dir.create(outdir, recursive = TRUE)}
+      
+      save(G, file = file.path(outdir, "G.rda"))
+      save(EVD, file = file.path(outdir, "EVD.rda"))
+    }
+    
+    for (i in seq_along(model_equation)) {
+      if (length(model_equation[[i]]) > 1 & is.vector(model_equation[[i]])) {
+        term <- paste(model_equation[[i]], collapse = "_")
+        result <- create_interaction_matrix(model_equation[[i]], tmpdir)
+        
+        outdir <- file.path(tmpdir, term)
+        if (!dir.exists(outdir)) { dir.create(outdir, recursive = TRUE)}
+        
+        G <- result[["G"]]
+        EVD<-eigen(G,symmetric = TRUE)
+        save(G, file=file.path(outdir,"G.rda"))
+        save(EVD, file=file.path(outdir,"EVD.rda"))
+      }
+    }
+    
+    cv_ids <- prep_data_for_cv(ydata, folds, cv1, cv2, cv0, cv00,seed)
+    all_terms <- sapply(model_equation, function(x) paste(x, collapse="_"))
+    fm <- get_predictions2(cv_ids, tmpdir, model_selected, all_terms, folds=folds, nIter=nIter,
+                    burnIn=burnIn, cv=NULL)
+    files <- generate_predict_results(predict_ds, fm)
+    
+    out_dir <- file.path(tmpdir, "output_predict")
+    if (!dir.exists(out_dir)) dir.create(out_dir, recursive = TRUE)
+    model_dir <- file.path(tmpdir, "output_predict", model_selected)
+    if (dir.exists(model_dir)) {
+      unlink(model_dir, recursive = TRUE)  
+    }
+    dir.create(model_dir, recursive = TRUE)  
+    
+    write.csv(files$prompt_out, file = file.path(model_dir, "prediction_prompt.csv"), row.names = FALSE)
+    write.csv(files$aux_out, file = file.path(model_dir, "prediction_main.csv"), row.names = FALSE)
+    showNotification('hecho todo', type = 'message')
   })
   
+  predict_files_reactive <- reactivePoll(
+    5000, 
+    session,
+    checkFunc = function() {
+      list.files(file.path(tmpdir, "output_predict"), pattern = "\\.csv$", recursive = TRUE)
+    },
+    valueFunc = function() {
+      list.files(file.path(tmpdir, "output_predict"), pattern = "\\.csv$", recursive = TRUE)
+    })
+  
+  output$predict_results_menu <- renderUI({
+    files <- predict_files_reactive()
+    if (length(files) > 0) {
+      fluidRow(
+        column(width = 6, 
+               selectInput("selected_file", "Choose a file:", choices = files),
+        ),
+        column(width = 6,
+               downloadButton("downloadAllPredictions", "Download All Predictions", class = "btn-secondary", style = "margin-top: 25px;")
+        )
+      )
+      
+    } else {
+      p("No CSV files found.")
+    }
+  })
+
+  output$predict_results_table <- renderDT({
+    req(input$selected_file)
+    file_path <- file.path(tmpdir, "output_predict", input$selected_file)
+    
+    if (file.exists(file_path)) {
+      DT::datatable(read.csv(file_path))
+    } else {
+      DT::datatable(data.frame())
+    }
+  })
+  
+  output$predict_viz_file <- renderUI({
+    all_output_files <- predict_files_reactive()
+    if (length(all_output_files) > 0) {
+      relative_paths <- gsub(file.path(tmpdir, "output_predict", "/?"), "", all_output_files, fixed = TRUE)
+      model_folders <- unique(sapply(strsplit(relative_paths, "/"), `[`, 1))
+      model_folders <- model_folders[!is.na(model_folders) & model_folders != ""]
+    } else {
+      model_folders <- character(0) 
+    }
+    
+    if (length(model_folders) == 0) {
+      model_choices <- ""
+      selected_model <- NULL
+    } else {
+      model_choices <- sort(model_folders) 
+      selected_model <- model_choices[1] 
+    }
+    
+    tagList(
+      selectInput(
+        "selected_model",
+        "1. Choose Prediction Model:",
+        choices = model_choices,
+        selected = selected_model
+      ),
+      helpText("Select a previously trained model. Its associated prediction data will be loaded for visualization."),
+      
+      radioButtons(
+        "predict_plot_cv",
+        "2. Select Visualization Type:",
+        choices = c("CV1-like", "CV0-like"),
+        selected = "CV1-like",
+        inline = TRUE
+      ),
+      helpText("Choose the type of visualization based on whether you're analyzing new genotypes in known environments (CV1-like) or known genotypes in new environments (CV0-like).")
+    )
+  })
+  output$predict_cv_options <- renderUI({
+    req(input$predict_plot_cv)
+    
+    model_dir <- file.path(tmpdir, "output_predict", input$selected_model)
+    file_path <- file.path(model_dir, "prediction_main.csv")
+    aux_out <- read.csv(file_path)
+    new_envs <- setdiff(aux_out$EID, filter(aux_out, Set %in% 'TRN')$EID)
+    
+    if (input$predict_plot_cv == "CV1-like") {
+      wellPanel(
+        h4("CV1-like Visualization Settings"),
+        sliderInput(
+          "p_sel_cv1",
+          "Highlight Top % of New Genotypes:", 
+          min = 0,
+          max = 100, 
+          value = 20, 
+          post = "%" 
+        ),
+        helpText("Adjust the percentage of new genotypes to highlight based on their predicted performance within environments."),
+        
+        radioButtons(
+          "top_cv1",
+          "Optimize Trait For:", 
+          choices = c(
+            "Higher is Better" = TRUE,  
+            "Lower is Better" = FALSE   
+          ),
+          selected = TRUE, 
+          inline = TRUE
+        ),
+        helpText("Select whether a higher or lower predicted trait value is desirable for your analysis (e.g., higher yield vs. lower disease score).")
+      )
+    } else if (input$predict_plot_cv == "CV0-like") {
+      wellPanel( 
+        h4("CV0-like Visualization Settings"), 
+        
+        selectInput(
+          "new_env_cv0",
+          "Select Environment for Analysis:",
+          choices = new_envs, 
+          selected = NULL
+        ),
+        helpText("Choose a specific predicted environment to identify the top/bottom genotypes for comparison across other environments."),
+        
+        sliderInput(
+          "k_cv0",
+          "Number of Top Genotypes (k):", 
+          min = 1,
+          max = 10, 
+          value = 5,
+          step = 1 
+        ),
+        helpText("Specify how many of the best or worst performing genotypes from the selected environment to highlight for comparison."),
+        
+        radioButtons(
+          "top_cv0",
+          "Optimize Trait For:", 
+          choices = c(
+            "Higher is Better" = TRUE,
+            "Lower is Better" = FALSE
+          ),
+          selected = TRUE, 
+          inline = TRUE
+        ),
+        helpText("Select whether a higher or lower predicted trait value is desirable when determining the 'top' genotypes (e.g., higher yield vs. lower disease score)."),
+
+        radioButtons(
+          "sc_cv0",
+          "Scale Data for Plot?", 
+          choices = c(
+            "Yes" = TRUE,
+            "No" = FALSE
+          ),
+          selected = TRUE,
+          inline = TRUE
+        ),
+        helpText("Enable scaling to normalize prediction values, which can improve visualization across different environments.")
+      )
+    }
+  })
+  
+  output$downloadAllPredictions <- downloadHandler(
+    filename = function() {
+      paste0("predictions_", Sys.Date(), ".zip")
+    },
+    content = function(file) {
+      zip::zipr(file, file.path(tmpdir,"output_predict"))
+    }
+  )
+  
+  output$predict_plot <- renderPlot({
+    req(input$selected_model, input$predict_plot_cv)
+    
+    model_dir <- file.path(tmpdir, "output_predict", input$selected_model)
+    file_path <- file.path(model_dir, "prediction_main.csv")
+    aux_out <- read.csv(file_path)
+
+    if (input$predict_plot_cv == "CV1-like") {
+      cv1_pred_plot(aux_out, input$p_sel_cv1 /100, input$top_cv1)
+    } else if (input$predict_plot_cv == "CV0-like") {
+      cv0_pred_plot(aux_out, input$k_cv0, input$new_env_cv0, input$top_cv0, input$sc_cv0)
+    }
+  })
   
   # AMMI and Bayesian indexes (GEI analyses)
   
