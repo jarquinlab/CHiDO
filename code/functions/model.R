@@ -389,7 +389,7 @@ prep_data_for_cv <- function(y_data, folds, cv1, cv2, cv0, cv00,seed=NULL) {
 
     for (i in seq(1,ncol(y_cv00),by=length(unique(retdf$cv1)))) {
       
-    for (j in 1:length(unique(retdf$cv0))){
+    for (j in 1:length(unique(retdf$cv1))){
       cl_ind<-i+(j-1)
       
       y_cv00[retdf$cv1==j ,cl_ind] <- NA
