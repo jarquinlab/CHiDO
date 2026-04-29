@@ -32,26 +32,27 @@ create_input_box <- function(label_text, input_id, default_value = NULL) {
   )
 }
 
-create_panel <- function(data_type, label) {
+create_panel <- function(data_type, label, kernel_toggle = FALSE) {
   id_col <- tolower(label)
-  
+
   panel <- conditionalPanel(
     condition = paste0("input.data_type == '", data_type, "'"),
-    # Label
-    div(style="display: flex; align-items: center; margin-top: -20px; padding: 2px;", 
+    div(style="display: flex; align-items: center; margin-top: -20px; padding: 2px;",
         tags$label("Reference Label:", style="width:200px;"),
         div(style="margin-left: auto; min-width: 60px; max-width: 70px;",
             textInput("label", "", label))
     ),
-    # ID
-    div(style="display: flex; align-items: center; margin-top: -20px; padding: 2px;", 
+    div(style="display: flex; align-items: center; margin-top: -20px; padding: 2px;",
         tags$label("Linkage column (relation to Y):", style="width: 200px;"),
-        div(style="margin-left: auto; min-width: 60px; max-width: 100px;", 
+        div(style="margin-left: auto; min-width: 60px; max-width: 100px;",
             numericInput("id_col", "", value = 1, min = 1, max = 999))
     ),
-    selectInput("linkage_type", "Linkage type", 
-                c("Environment ID", "Genotype / Line ID", "Compound ID / UID")
-                )
+    selectInput("linkage_type", "Linkage type",
+                c("Environment ID", "Genotype / Line ID", "Compound ID / UID")),
+    if (kernel_toggle)
+      radioButtons("input_structure", "Input structure",
+                   choices = c("Predictors (X)", "Kernel (K)"),
+                   selected = "Predictors (X)", inline = TRUE)
   )
   return(panel)
 }

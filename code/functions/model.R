@@ -183,36 +183,36 @@ create_g_matrix <- function(o_data, y_data, wht=FALSE, ctr=FALSE, std=FALSE,
     O <- as.matrix(data[,-id_col])
     rownames(O) <- data[[id_col]]
     
-    if (!type %in% c("pedigree data","genomic relationship matrix")) {
+    if (!type %in% c("pedigree data", "genomic relationship matrix") && !isTRUE(o_data$is_kernel)) {
       # Do the processing for data to reach initial G
       s <- 0
       GO <- pre_process_data(O, type, s, wht, ctr, std, prop_maf_j)
-      rownames(GO)<-data[[id_col]]
-      colnames(GO)<-data[[id_col]]
+      rownames(GO) <- data[[id_col]]
+      colnames(GO) <- data[[id_col]]
 
-      # Ensure all Y IDs 
+      # Ensure all Y IDs
       if(!all(ids %in% rownames(GO))) {
-        # There was an error, check that data is available for all genotypes
         showNotification("There was an error, check that data is available for all genotypes",
                          type = "error")
-        return ()
+        return()
       }
-      GO <- GO[ rownames(GO) %in% unique(ids)  ,  colnames(GO) %in% unique(ids) ]
-      
+      GO <- GO[ rownames(GO) %in% unique(ids), colnames(GO) %in% unique(ids) ]
+
       ids <- factor(ids, levels = rownames(GO))
-      Z <- Matrix(model.matrix(~ids - 1),sparse=TRUE)
+      Z <- Matrix(model.matrix(~ids - 1), sparse=TRUE)
       GO <- tcrossprod(Z, GO)
-      
-    } else if(type=="pedigree data"){
-      # Initial O matrix for pedigree data
-      O <- O[ rownames(O) %in% unique(ids)  ,  colnames(O) %in% unique(ids) ]
+
+    } else if (type == "pedigree data") {
+      # Pedigree relationship matrix (2 * A)
+      O <- O[ rownames(O) %in% unique(ids), colnames(O) %in% unique(ids) ]
       ids <- factor(ids, levels = rownames(O))
-      Z <- Matrix(model.matrix(~ids - 1),sparse=TRUE)
-      GO <- tcrossprod(Z, 2*as.matrix(O))
-    }else{
-      O <- O[ rownames(O) %in% unique(ids)  ,  colnames(O) %in% unique(ids) ]
+      Z <- Matrix(model.matrix(~ids - 1), sparse=TRUE)
+      GO <- tcrossprod(Z, 2 * as.matrix(O))
+    } else {
+      # Pre-computed kernel (genomic relationship matrix or user-supplied kernel)
+      O <- O[ rownames(O) %in% unique(ids), colnames(O) %in% unique(ids) ]
       ids <- factor(ids, levels = rownames(O))
-      Z <- Matrix(model.matrix(~ids - 1),sparse=TRUE)
+      Z <- Matrix(model.matrix(~ids - 1), sparse=TRUE)
       GO <- tcrossprod(Z, as.matrix(O))
     }
     

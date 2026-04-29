@@ -103,11 +103,27 @@ server <- function(input, output, session) {
   # Generate a dynamic upload panel based on omic type selected
   output$data_panel <- renderUI({
     if (input$modtype=="Genotype level"){
-      if (input$data_type %in% c("high-throughput data", "other")) {
-        panel <- create_panel(input$data_type, input$label)
-      } 
-      else {
-        
+      if (input$data_type == "other") {
+        panel <- create_panel(input$data_type, input$label, kernel_toggle = TRUE)
+      } else if (input$data_type == "high-throughput data") {
+        panel <- div(
+          div(
+            style = "display: flex; align-items: center; margin-top: -27px; padding: 4px;",
+            tags$label('*Reference label:', style = "width:200px;"),
+            div(style = "margin-left: auto; min-width: 60px; max-width: 70px;",
+                textInput("label", "", ""))
+          ),
+          div(
+            style = "display: flex; align-items: center; margin-top: -27px; padding: 4px;",
+            tags$label("*Individual / UID column:", style = "width: 200px;"),
+            div(
+              style = "margin-left: auto; min-width: 60px; max-width: 100px;",
+              numericInput("id_col", "", value = 1, min = 1, max = 999)
+            )
+          )
+        )
+      } else {
+
         label_id <- ifelse(input$data_type == "environmental markers",
                            "*Environment ID",
                            "*Genotype / Line ID")
@@ -418,28 +434,31 @@ server <- function(input, output, session) {
     if (input$modtype=="Genotype level"){
       
       # Create omic metadata object
-      config <- create_omic_config(input$file, input$label, input$data_type,input$modtype, 
-                                   input$id_col, link = input$linkage_type)
-      
+      config <- create_omic_config(input$file, input$label, input$data_type, input$modtype,
+                                   input$id_col,
+                                   link = input$linkage_type,
+                                   is_kernel = input$data_type == "other" &&
+                                     isTRUE(input$input_structure == "Kernel (K)"))
+
       if(is.null(config)) {
         showNotification("No file was uploaded, try again.", type="error")
         return()
       }
-      
+
       if(input$check_data & is.null(input$y_file)){
         #showNotification("To check data consistency you need to upload phenotype response file (Y).", type="error")
         return()
       }
-      
+
       verified <- verify_omic_object(config)
-      
+
       if(verified) {
-        
-        # Add data to metadata config 
+
+        # Add data to metadata config
         config$data <- load_data(input$file$datapath)
-        
-        if(config$type%in%c("pedigree data","genomic relationship matrix")){
-          colnames(config$data)[-1]<-config$data[,config$id_col]
+
+        if(config$type %in% c("pedigree data", "genomic relationship matrix") || isTRUE(config$is_kernel)){
+          colnames(config$data)[-1] <- config$data[, config$id_col]
         }
         
         # Grab values from reactive objects
@@ -478,27 +497,30 @@ server <- function(input, output, session) {
     }else if(input$modtype=="Combining ability"){
       if (!input$linkage_type=="Parent Groups ID"){
         # Create omic metadata object
-        config <- create_omic_config(input$file, input$label, input$data_type,input$modtype, 
-                                     input$id_col, link = input$linkage_type)
+        config <- create_omic_config(input$file, input$label, input$data_type, input$modtype,
+                                     input$id_col,
+                                     link = input$linkage_type,
+                                     is_kernel = input$data_type == "other" &&
+                                       isTRUE(input$input_structure == "Kernel (K)"))
         if(is.null(config)) {
           showNotification("No file was uploaded, try again.", type="error")
           return()
         }
-        
+
         if(input$check_data & is.null(input$y_file)){
           #showNotification("To check data consistency you need to upload phenotype response file (Y).", type="error")
           return()
         }
-        
-        verified <- verify_omic_object(config,modtype="Combining ability")
-        
+
+        verified <- verify_omic_object(config, modtype="Combining ability")
+
         if(verified) {
-          
-          # Add data to metadata config 
+
+          # Add data to metadata config
           config$data <- load_data(input$file$datapath)
-          
-          if(config$type%in%c("pedigree data","genomic relationship matrix")){
-            colnames(config$data)[-1]<-config$data[,config$id_col]
+
+          if(config$type %in% c("pedigree data", "genomic relationship matrix") || isTRUE(config$is_kernel)){
+            colnames(config$data)[-1] <- config$data[, config$id_col]
           }
           # Grab values from reactive objects
           curr_data <- data_sources()
@@ -537,24 +559,31 @@ server <- function(input, output, session) {
     }else{
       if (!input$linkage_type=="Parent Groups ID"){
         # Create omic metadata object
-        config <- create_omic_config(input$file, input$label, input$data_type,input$modtype, 
-                                     input$id_col, link = input$linkage_type)
+        config <- create_omic_config(input$file, input$label, input$data_type, input$modtype,
+                                     input$id_col,
+                                     link = input$linkage_type,
+                                     is_kernel = input$data_type == "other" &&
+                                       isTRUE(input$input_structure == "Kernel (K)"))
         if(is.null(config)) {
           showNotification("No file was uploaded, try again.", type="error")
           return()
         }
-        
+
         if(input$check_data & is.null(input$y_file)){
           #showNotification("To check data consistency you need to upload phenotype response file (Y).", type="error")
           return()
         }
-        
-        verified <- verify_omic_object(config,modtype="Host-Pathogen")
-        
+
+        verified <- verify_omic_object(config, modtype="Host-Pathogen")
+
         if(verified) {
-          
-          # Add data to metadata config 
+
+          # Add data to metadata config
           config$data <- load_data(input$file$datapath)
+
+          if(isTRUE(config$is_kernel)){
+            colnames(config$data)[-1] <- config$data[, config$id_col]
+          }
           
           # Grab values from reactive objects
           curr_data <- data_sources()

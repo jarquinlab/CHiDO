@@ -70,11 +70,11 @@ preprocess_box <- box(
   div(style="display:flex; align-items:center; margin-top:-20px; padding:5px;",
       tags$label("NaN threshold (%):", style="width:200px;"),
       div(style="margin-left:auto; min-width:60px; max-width: 80px;",
-          numericInput("nan_freq","",value=0, min=0, max=99))),
+          numericInput("nan_freq","",value=50, min=0, max=99))),
   helpText("Select any data transformations needed prior to model training"),
-  column(6, 
-         checkboxInput("std","Standardizing", value=FALSE),
-         checkboxInput("ctr","Centering", value=FALSE)
+  column(6,
+         checkboxInput("std","Standardizing", value=TRUE),
+         checkboxInput("ctr","Centering", value=TRUE)
   )
 )
 
