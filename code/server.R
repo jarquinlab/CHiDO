@@ -1269,22 +1269,34 @@ server <- function(input, output, session) {
   ### Predict New Phenotypes tab ----
   observeEvent(input$pred_y_load, {
     req(input$pred_y_file)
-    req(input$gid_col2, input$eid_col2, input$uid_col2)
+    req(input$gid_col2, input$eid_col2)
     
     df <- read.csv(input$pred_y_file$datapath, stringsAsFactors = FALSE)
-    req(all(c(input$gid_col2, input$eid_col2, input$uid_col2) <= ncol(df)))
-    
+    req(all(c(input$gid_col2, input$eid_col2) <= ncol(df)))
+
+    uid_vals <- if (!is.na(input$uid_col2) && input$uid_col2 <= ncol(df)) {
+      df[[input$uid_col2]]
+    } else {
+      paste(df[[input$eid_col2]], df[[input$gid_col2]], sep = "_")
+    }
+
     predict_prompt(data.frame(
       EID = df[[input$eid_col2]],
       GID = df[[input$gid_col2]],
-      UID = df[[input$uid_col2]],
+      UID = uid_vals,
       stringsAsFactors = FALSE
     ))
     
-    showNotification(paste("Loaded predict_prompt with", 
-                           nrow(predict_prompt()), "rows and", 
-                           ncol(predict_prompt()), "columns."), 
-                     type = "message")
+    tryCatch({
+      model_sel <- input$predict_model
+      if (!is.null(model_sel) && model_sel != "" && !is.null(saved_models()[[model_sel]])) {
+        model_omics <- extract_omics(saved_models()[[model_sel]])
+        if (all(model_omics %in% names(data_sources2()))) {
+          enable("run_predictions")
+        }
+      }
+    }, error = function(e) NULL)
+    showNotification("Prompt updated", type = "message")
   })
   
   
@@ -1351,6 +1363,8 @@ server <- function(input, output, session) {
   
   observeEvent(input$run_predictions, {
     req(input$run_predictions)
+    req(nrow(predict_prompt()) > 0)
+    print('run_predictions entered')
 
     predict_ds <- predict_helper(trn_list = data_sources(), prd_list = data_sources2(),
                    phen_list = phen_data(), prompt = predict_prompt(),
@@ -1504,11 +1518,11 @@ server <- function(input, output, session) {
       radioButtons(
         "predict_plot_cv",
         "2. Select Visualization Type:",
-        choices = c("CV1-like", "CV0-like"),
-        selected = "CV1-like",
+        choices = c("CV2/CV1-like", "CV0/CV00-like"),
+        selected = "CV2/CV1-like",
         inline = TRUE
       ),
-      helpText("Choose the type of visualization based on whether you're analyzing new genotypes in known environments (CV1-like) or known genotypes in new environments (CV0-like).")
+      helpText("CV2/CV1-like shows predictions in training environments — orange for genotypes seen elsewhere (CV2), green for first-time genotypes (CV1). CV0/CV00-like shows predictions in new environments — orange for genotypes with training history (CV0), green for fully new genotypes (CV00).")
     )
   })
   output$predict_cv_options <- renderUI({
@@ -1519,9 +1533,9 @@ server <- function(input, output, session) {
     aux_out <- read.csv(file_path)
     new_envs <- setdiff(aux_out$EID, filter(aux_out, Set %in% 'TRN')$EID)
     
-    if (input$predict_plot_cv == "CV1-like") {
+    if (input$predict_plot_cv == "CV2/CV1-like") {
       wellPanel(
-        h4("CV1-like Visualization Settings"),
+        h4("CV2/CV1-like Visualization Settings"),
         sliderInput(
           "p_sel_cv1",
           "Highlight Top % of New Genotypes:", 
@@ -1544,9 +1558,9 @@ server <- function(input, output, session) {
         ),
         helpText("Select whether a higher or lower predicted trait value is desirable for your analysis (e.g., higher yield vs. lower disease score).")
       )
-    } else if (input$predict_plot_cv == "CV0-like") {
-      wellPanel( 
-        h4("CV0-like Visualization Settings"), 
+    } else if (input$predict_plot_cv == "CV0/CV00-like") {
+      wellPanel(
+        h4("CV0/CV00-like Visualization Settings"),
         
         selectInput(
           "new_env_cv0",
@@ -1580,7 +1594,7 @@ server <- function(input, output, session) {
 
         radioButtons(
           "sc_cv0",
-          "Scale Data for Plot?", 
+          "Scale Data for Plot?",
           choices = c(
             "Yes" = TRUE,
             "No" = FALSE
@@ -1588,7 +1602,14 @@ server <- function(input, output, session) {
           selected = TRUE,
           inline = TRUE
         ),
-        helpText("Enable scaling to normalize prediction values, which can improve visualization across different environments.")
+        helpText("Enable scaling to normalize prediction values, which can improve visualization across different environments."),
+
+        checkboxInput(
+          "cv0_only",
+          "Show only verifiable candidates (CV0)",
+          value = TRUE
+        ),
+        helpText("When checked, top-k selection is restricted to genotypes already observed in training environments (CV0). Uncheck to also include fully new genotypes (CV00, shown in green).")
       )
     }
   })
@@ -1604,15 +1625,21 @@ server <- function(input, output, session) {
   
   output$predict_plot <- renderPlot({
     req(input$selected_model, input$predict_plot_cv)
-    
+
     model_dir <- file.path(tmpdir, "output_predict", input$selected_model)
     file_path <- file.path(model_dir, "prediction_main.csv")
     aux_out <- read.csv(file_path)
+    trn_gids <- unique(aux_out$GID[aux_out$Set == "TRN"])
+    trn_eids <- unique(aux_out$EID[aux_out$Set == "TRN"])
+    aux_out$new_gen <- !(aux_out$GID %in% trn_gids)
+    aux_out$new_env <- !(aux_out$EID %in% trn_eids)
 
-    if (input$predict_plot_cv == "CV1-like") {
-      cv1_pred_plot(aux_out, input$p_sel_cv1 /100, input$top_cv1)
-    } else if (input$predict_plot_cv == "CV0-like") {
-      cv0_pred_plot(aux_out, input$k_cv0, input$new_env_cv0, input$top_cv0, input$sc_cv0)
+    if (input$predict_plot_cv == "CV2/CV1-like") {
+      req(input$p_sel_cv1)
+      cv1_pred_plot(aux_out, input$p_sel_cv1 / 100, input$top_cv1)
+    } else if (input$predict_plot_cv == "CV0/CV00-like") {
+      req(input$new_env_cv0)
+      cv0_pred_plot(aux_out, input$k_cv0, input$new_env_cv0, input$top_cv0, input$sc_cv0, isTRUE(input$cv0_only))
     }
   })
   

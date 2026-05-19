@@ -458,7 +458,7 @@ get_predictions <- function(data, tmpdir, model_selected, model_eq, cv, folds,
 
   } else {
     # Using full data to get variance components
-    fm <- BGLR(y=y,ETA=eta,nIter=nIter,burnIn=burnIn,verbose=TRUE)
+    fm <- BGLR(y=y,ETA=eta,nIter=nIter,burnIn=burnIn,verbose=FALSE)
     fm$equation <-  model_eq
     
     # Save fm
