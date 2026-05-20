@@ -1513,7 +1513,7 @@ server <- function(input, output, session) {
         choices = model_choices,
         selected = selected_model
       ),
-      helpText("Select a previously trained model. Its associated prediction data will be loaded for visualization."),
+      helpText("Select a model you have already run predictions with. Its inference results will be loaded for visualization."),
       
       radioButtons(
         "predict_plot_cv",
@@ -1522,7 +1522,10 @@ server <- function(input, output, session) {
         selected = "CV2/CV1",
         inline = TRUE
       ),
-      helpText("CV2/CV1 shows predictions in training environments — orange for genotypes seen elsewhere (CV2), green for first-time genotypes (CV1). CV0/CV00 shows predictions in new environments — orange for genotypes with training history (CV0), green for fully new genotypes (CV00).")
+      tags$ul(
+        tags$li("CV2/CV1 -> predictions in training environments: orange for genotypes seen before (CV2), green for first-time genotypes (CV1)."),
+        tags$li("CV0/CV00 -> predictions in new environments: orange for genotypes with training history (CV0), green for fully new genotypes (CV00).")
+      )
     )
   })
   output$predict_cv_options <- renderUI({
