@@ -1518,11 +1518,11 @@ server <- function(input, output, session) {
       radioButtons(
         "predict_plot_cv",
         "2. Select Visualization Type:",
-        choices = c("CV2/CV1-like", "CV0/CV00-like"),
-        selected = "CV2/CV1-like",
+        choices = c("CV2/CV1", "CV0/CV00"),
+        selected = "CV2/CV1",
         inline = TRUE
       ),
-      helpText("CV2/CV1-like shows predictions in training environments — orange for genotypes seen elsewhere (CV2), green for first-time genotypes (CV1). CV0/CV00-like shows predictions in new environments — orange for genotypes with training history (CV0), green for fully new genotypes (CV00).")
+      helpText("CV2/CV1 shows predictions in training environments — orange for genotypes seen elsewhere (CV2), green for first-time genotypes (CV1). CV0/CV00 shows predictions in new environments — orange for genotypes with training history (CV0), green for fully new genotypes (CV00).")
     )
   })
   output$predict_cv_options <- renderUI({
@@ -1533,9 +1533,9 @@ server <- function(input, output, session) {
     aux_out <- read.csv(file_path)
     new_envs <- setdiff(aux_out$EID, filter(aux_out, Set %in% 'TRN')$EID)
     
-    if (input$predict_plot_cv == "CV2/CV1-like") {
+    if (input$predict_plot_cv == "CV2/CV1") {
       wellPanel(
-        h4("CV2/CV1-like Visualization Settings"),
+        h4("CV2/CV1 Visualization Settings"),
         sliderInput(
           "p_sel_cv1",
           "Highlight Top % of New Genotypes:", 
@@ -1558,9 +1558,9 @@ server <- function(input, output, session) {
         ),
         helpText("Select whether a higher or lower predicted trait value is desirable for your analysis (e.g., higher yield vs. lower disease score).")
       )
-    } else if (input$predict_plot_cv == "CV0/CV00-like") {
+    } else if (input$predict_plot_cv == "CV0/CV00") {
       wellPanel(
-        h4("CV0/CV00-like Visualization Settings"),
+        h4("CV0/CV00 Visualization Settings"),
         
         selectInput(
           "new_env_cv0",
@@ -1634,10 +1634,10 @@ server <- function(input, output, session) {
     aux_out$new_gen <- !(aux_out$GID %in% trn_gids)
     aux_out$new_env <- !(aux_out$EID %in% trn_eids)
 
-    if (input$predict_plot_cv == "CV2/CV1-like") {
+    if (input$predict_plot_cv == "CV2/CV1") {
       req(input$p_sel_cv1)
       cv1_pred_plot(aux_out, input$p_sel_cv1 / 100, input$top_cv1)
-    } else if (input$predict_plot_cv == "CV0/CV00-like") {
+    } else if (input$predict_plot_cv == "CV0/CV00") {
       req(input$new_env_cv0)
       cv0_pred_plot(aux_out, input$k_cv0, input$new_env_cv0, input$top_cv0, input$sc_cv0, isTRUE(input$cv0_only))
     }

@@ -29,7 +29,7 @@ load_data <- function(path = NULL) {
     }
     # CSV files
     else if (grepl("\\.csv$", path)) {
-      file <- read.csv(path)
+      file <- read.csv(path, check.names = FALSE)
     }
     # Text files
     else if (grepl("\\.txt$", path)) {

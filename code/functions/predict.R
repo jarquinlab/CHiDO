@@ -167,7 +167,8 @@ cv1_pred_plot <- function(aux_out, p, top = TRUE){
   df$color_group <- ifelse(df$hl, df$plot_group, "other")
 
   ggplot(df, aes(x = EID, y = yHat, color = color_group, alpha = hl)) +
-    geom_jitter(size = 2) +
+    geom_jitter(data = subset(df, color_group == "other"), size = 2) +
+    geom_jitter(data = subset(df, color_group != "other"), size = 2) +
     geom_segment(data = quantiles,
                  aes(x = xstart, xend = xend, y = yint, yend = yint),
                  inherit.aes = FALSE,
@@ -215,8 +216,9 @@ cv0_pred_plot <- function(aux_out, k, target_env, top = TRUE, sc = TRUE, cv0_onl
   }
 
   df %>% ggplot(aes(x = EID, y = yHat, color = color_group, alpha = hl))+
-    geom_line(data = filter(df, hl, plot_group != "PRD (CV00)"), aes(group = GID), color = 'black')+
-    geom_point(size = 3)+
+    geom_point(data = subset(df, color_group == "other"), size = 3)+
+    geom_line(data = filter(df, hl), aes(group = GID), color = 'black')+
+    geom_point(data = subset(df, color_group != "other"), size = 3)+
     scale_alpha_manual(values = c(0.15, 1))+
     scale_color_manual(name = "Set",
                        values = c("TRN" = "#0021A5", "PRD (CV0)" = "#FA4616", "PRD (CV00)" = "#27AE60", "other" = "gray80"),

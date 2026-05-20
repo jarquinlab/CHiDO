@@ -55,11 +55,11 @@ interpretation_guide_ui <- tagList(
   p("The ", strong("Visualization tab"), " is designed to help you understand the predicted phenotypes:
     "),
 
-  h3("Top Genotypes in Known Environments (CV1-like)"),
+  h3("Top Genotypes in Known Environments (CV2/CV1)"),
   p("This plot highlights genotypes that fall into the extreme ", strong("p% of predicted values"), 
     ", allowing the detection of promising candidates that are part of the prediction (PRD) set and therefore were never tested in the TRN environments."),
   
-  h3("Top Genotypes in PRD Environment Across TRN Environments (CV0-like)"),
+  h3("Top Genotypes in PRD Environment Across TRN Environments (CV0/CV00)"),
   p("This plot displays the performance of the ", strong("top k lines"), " (identified as best in a specific ", strong("new environment"), ") across ", 
     strong("all TRN environments"), "providing a measure of similarity between environments in the same TPE."),
   tags$hr()
