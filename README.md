@@ -17,7 +17,7 @@ There is a demo version of CHiDO hosted as a free web application at:
 ## Authors
 
 -   Francisco González - University of Florida (UF)
--   Julián García - Universidad Politécnica de Madrid (UPM)
+-   Julián García-Abadillo -University of Florida (UF) and Universidad Politécnica de Madrid (UPM)
 -   Vitor Sagae - University of Florida (UF) and Federal University of Viçosa (UFV)
 -   Dr. Diego Jarquin - University of Florida (UF)
 
@@ -34,11 +34,12 @@ Once you clone/download the repository, ensure you are in the CHiDO
 directory and run the following command in the terminal:
 
 ``` r
-Rscript -e 'packages <- readLines("requirements.txt"); for(package in packages) if (!require(package, character.only = TRUE)) install.packages(package, dependencies = TRUE)'
+Rscript install.R
 ```
 
 This will ensure all prerequisite libraries and any of their
-dependencies are installed in your local environment.
+dependencies are installed in your local environment. The script will
+print a summary of what was installed and flag any packages that failed.
 
 ### Step-by-step Guide
 

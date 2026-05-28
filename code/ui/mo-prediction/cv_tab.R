@@ -72,7 +72,7 @@ preprocess_box <- box(
       div(style="margin-left:auto; min-width:60px; max-width: 80px;",
           numericInput("nan_freq","",value=20, min=0, max=99))),
   helpText("Select any data transformations needed prior to model training"),
-  column(6, 
+  column(6,
          checkboxInput("std","Standardizing", value=TRUE),
          checkboxInput("ctr","Centering", value=TRUE)
   )

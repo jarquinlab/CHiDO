@@ -35,7 +35,7 @@ add_omics_instructions <- "<strong>Instructions:</strong><br>Select the file(s)
   to others. For example, for the <strong>phenotypic response file</strong> 
   (left), you must specify at least the following columns: (1) genotypes/lines 
   IDs, (2) environment/plot IDs, and (3) the target trait. Optionally, you can
-  specify a sample/inidividual-level ID if there was data collected at such 
+  specify a sample/individual-level ID if there was data collected at such 
   level. For omics uploads (right), you must specify the ID column and ID type
   to link the data to your phenotypic response data. You can modify the 
   <em>Reference Label</em> at your discretion. Make sure to mark the correct 

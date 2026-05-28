@@ -48,8 +48,9 @@ load_data <- function(path = NULL) {
 }
 
 # Create omic metadata list, no actual omic data is attached yet
-create_omic_config <- function(file, label, data_type,modtype, id_col, gid_col = NULL,
-                               g1id_col = NULL, g2id_col = NULL,hostpatid_col=NULL,patid_col=NULL,eid_col = NULL, uid_col=NULL, link = NULL) {
+create_omic_config <- function(file, label, data_type, modtype, id_col, gid_col = NULL,
+                               g1id_col = NULL, g2id_col = NULL, hostpatid_col=NULL, patid_col=NULL,
+                               eid_col = NULL, uid_col=NULL, link = NULL, is_kernel = FALSE) {
   if(!is.null(file)) {
     
     config <- list(
@@ -86,6 +87,8 @@ create_omic_config <- function(file, label, data_type,modtype, id_col, gid_col =
         linkage_type = "Genotype / Line ID"
       } else if (tolower(data_type) == "environmental markers") {
         linkage_type = "Environment ID"
+      } else if (tolower(data_type) == "high-throughput data") {
+        linkage_type = "Compound ID / UID"
       } else {
         linkage_type = link
       }}else{
@@ -101,7 +104,7 @@ create_omic_config <- function(file, label, data_type,modtype, id_col, gid_col =
       
       config$id_col <- as.integer(id_col)
       config$linkage_type <- linkage_type
-      #config$uid_col<-as.integer(uid_col)
+      config$is_kernel <- isTRUE(is_kernel)
     }
     
     # Return omic metadata
