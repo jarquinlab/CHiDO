@@ -97,6 +97,9 @@ get_predictions2 <- function(data, tmpdir, model_selected, model_eq, cv, folds,
   # Create output directory
   outdir <- file.path(tmpdir, "output", model_selected)
   if (!dir.exists(outdir)) { dir.create(outdir, recursive = TRUE) }
+  .bglr_chains <- file.path(tempdir(), ".bglr_chains")
+  dir.create(.bglr_chains, showWarnings = FALSE, recursive = TRUE)
+  .bglr_saveAt <- file.path(.bglr_chains, "chain_")
   
   y <- data[, 3]            # Observed values
   eid <- data[, 2]          # Environment IDs
@@ -112,7 +115,8 @@ get_predictions2 <- function(data, tmpdir, model_selected, model_eq, cv, folds,
     rm(Z)
   }
   
-  fm <- BGLR(y=y,ETA=eta,nIter=nIter,burnIn=burnIn,verbose=FALSE)
+  fm <- BGLR(y=y,ETA=eta,nIter=nIter,burnIn=burnIn,verbose=FALSE,
+             saveAt=.bglr_saveAt)
   fm$equation <-  model_eq
   return(fm)
 }

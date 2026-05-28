@@ -410,7 +410,10 @@ get_predictions <- function(data, tmpdir, model_selected, model_eq, cv, folds,
   # Create output directory
   outdir <- file.path(tmpdir, "output", model_selected)
   if (!dir.exists(outdir)) { dir.create(outdir, recursive = TRUE) }
-  
+  .bglr_chains <- file.path(tempdir(), ".bglr_chains")
+  dir.create(.bglr_chains, showWarnings = FALSE, recursive = TRUE)
+  .bglr_saveAt <- file.path(.bglr_chains, "chain_")
+
   # Create base prediciton data frame
   predictions <- data.frame(testing = integer(),
                             fold = integer(),
@@ -458,7 +461,7 @@ get_predictions <- function(data, tmpdir, model_selected, model_eq, cv, folds,
 
   } else {
     # Using full data to get variance components
-    fm <- BGLR(y=y,ETA=eta,nIter=nIter,burnIn=burnIn,verbose=FALSE)
+    fm <- BGLR(y=y,ETA=eta,nIter=nIter,burnIn=burnIn,verbose=FALSE,saveAt=.bglr_saveAt)
     fm$equation <-  model_eq
     
     # Save fm
@@ -473,11 +476,14 @@ get_predictions <- function(data, tmpdir, model_selected, model_eq, cv, folds,
 }
 
 fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
-  
+
   y <- data[, 3]            # Observed values
   eid <- data[, 2]          # Environment IDs
   gid <- data[, 1]          # Line IDs
   eids<- unique(eid)
+  .bglr_chains <- file.path(tempdir(), ".bglr_chains")
+  dir.create(.bglr_chains, showWarnings = FALSE, recursive = TRUE)
+  .bglr_saveAt <- file.path(.bglr_chains, "chain_")
   
   if (cv %in% c("cv00")) {
 
@@ -508,7 +514,7 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
       }
       
       # Fit BGLR model with training data
-      fm <- BGLR(y=y_na, ETA=eta, nIter=nIter, burnIn=burnIn, verbose=FALSE)
+      fm <- BGLR(y=y_na, ETA=eta, nIter=nIter, burnIn=burnIn, verbose=FALSE, saveAt=.bglr_saveAt)
       
       # Predict with the fitted model
       preds <- data.frame(testing = testing, fold = paste0("CV1:",data$cv1[testing],"x","CV0:",data$cv0[testing],sep=" "), env = eid[testing],
@@ -532,7 +538,7 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
         y_na[testing] <- NA
       
       # Fit BGLR model with training data
-      fm <- BGLR(y=y_na, ETA=eta, nIter=nIter, burnIn=burnIn, verbose=FALSE)
+      fm <- BGLR(y=y_na, ETA=eta, nIter=nIter, burnIn=burnIn, verbose=FALSE, saveAt=.bglr_saveAt)
       
       # Predict with the fitted model
       preds <- data.frame(testing = testing, fold = fold, env = eid[testing],
@@ -556,7 +562,7 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
         y_na[testing] <- NA
         
         # Fit BGLR model
-        fm <- BGLR(y=y_na, ETA = eta, nIter=nIter, burnIn=burnIn, verbose=FALSE)
+        fm <- BGLR(y=y_na, ETA = eta, nIter=nIter, burnIn=burnIn, verbose=FALSE, saveAt=.bglr_saveAt)
         
         # Generate predictions
         
