@@ -112,7 +112,6 @@ get_predictions2 <- function(data, tmpdir, model_selected, model_eq, cv, folds,
     rm(Z)
   }
   
-  print('predicting')
   fm <- BGLR(y=y,ETA=eta,nIter=nIter,burnIn=burnIn,verbose=FALSE)
   fm$equation <-  model_eq
   return(fm)

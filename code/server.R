@@ -1218,10 +1218,10 @@ server <- function(input, output, session) {
   
   # Reactive poll to check for new files every 5 seconds
   files_reactive <- reactivePoll(
-    5000, 
+    5000,
     session,
     checkFunc = function() {
-      list.files(file.path(tmpdir, "output"), pattern = "\\.csv$", recursive = TRUE)
+      length(list.files(file.path(tmpdir, "output"), pattern = "\\.csv$", recursive = TRUE))
     },
     valueFunc = function() {
       list.files(file.path(tmpdir, "output"), pattern = "\\.csv$", recursive = TRUE)
@@ -1332,7 +1332,7 @@ server <- function(input, output, session) {
         }
       }
     }, error = function(e) NULL)
-    showNotification("Prompt updated", type = "message")
+    showNotification("Prompt loaded successfully", type = "message")
   })
   
   
@@ -1491,10 +1491,10 @@ server <- function(input, output, session) {
   })
   
   predict_files_reactive <- reactivePoll(
-    5000, 
+    5000,
     session,
     checkFunc = function() {
-      list.files(file.path(tmpdir, "output_predict"), pattern = "\\.csv$", recursive = TRUE)
+      length(list.files(file.path(tmpdir, "output_predict"), pattern = "\\.csv$", recursive = TRUE))
     },
     valueFunc = function() {
       list.files(file.path(tmpdir, "output_predict"), pattern = "\\.csv$", recursive = TRUE)
@@ -1531,8 +1531,7 @@ server <- function(input, output, session) {
   output$predict_viz_file <- renderUI({
     all_output_files <- predict_files_reactive()
     if (length(all_output_files) > 0) {
-      relative_paths <- gsub(file.path(tmpdir, "output_predict", "/?"), "", all_output_files, fixed = TRUE)
-      model_folders <- unique(sapply(strsplit(relative_paths, "/"), `[`, 1))
+      model_folders <- unique(sapply(strsplit(all_output_files, "/"), `[`, 1))
       model_folders <- model_folders[!is.na(model_folders) & model_folders != ""]
     } else {
       model_folders <- character(0) 
