@@ -56,7 +56,6 @@ predict_helper <- function(trn_list, prd_list, phen_list, prompt, model){
     Reduce("&", pred_booleans)
   }
   prompt$Model <- model
-  prompt$Y <- NA
   trn_gids <- unique(phen_list$data[, phen_list$gid_col])
   trn_eids <- unique(phen_list$data[, phen_list$eid_col])
   new_gen <- !(prompt$GID %in% trn_gids)
@@ -125,7 +124,6 @@ generate_predict_results <- function(predict_ds, fm){
   
   # file 1 -> original prompt + yHats
   prompt_out <- prompt
-  prompt_out$Y <- NULL
   prompt_out$index <- NULL
   
   # file 2 <- TRN + original prompt - useful for plots
@@ -166,9 +164,25 @@ cv1_pred_plot <- function(aux_out, p, top = TRUE){
   df$hl <- if (top) df$yHat > df$top else df$yHat < df$bot
   df$color_group <- ifelse(df$hl, df$plot_group, "other")
 
-  ggplot(df, aes(x = EID, y = yHat, color = color_group, alpha = hl)) +
-    geom_jitter(data = subset(df, color_group == "other"), size = 2) +
-    geom_jitter(data = subset(df, color_group != "other"), size = 2) +
+  trn_obs <- aux_out %>%
+    filter(Set == "TRN") %>%
+    group_by(GID) %>%
+    summarize(first_env = sort(unique(as.character(EID)))[1],
+              n_envs = n_distinct(EID), .groups = "drop")
+
+  df <- df %>%
+    left_join(trn_obs, by = "GID") %>%
+    mutate(obs_label = case_when(
+      new_gen     ~ "Never observed in training",
+      n_envs == 1 ~ paste0("Observed in: ", first_env),
+      TRUE        ~ paste0("Observed in: ", first_env, " and ", n_envs - 1, " other(s)")
+    ))
+
+  p <- ggplot(df, aes(x = EID, y = yHat, color = color_group, alpha = hl,
+                      tooltip = paste0("GID: ", GID, " | EID: ", EID, "\nyHat: ", round(yHat, 3), "\n", obs_label),
+                      data_id = GID)) +
+    geom_point_interactive(data = subset(df, color_group == "other"), size = 1, position = position_quasirandom()) +
+    geom_point_interactive(data = subset(df, color_group != "other"), size = 1, position = position_quasirandom()) +
     geom_segment(data = quantiles,
                  aes(x = xstart, xend = xend, y = yint, yend = yint),
                  inherit.aes = FALSE,
@@ -178,11 +192,169 @@ cv1_pred_plot <- function(aux_out, p, top = TRUE){
                        values = c("TRN" = "#0021A5", "PRD (CV2)" = "#FA4616", "PRD (CV1)" = "#27AE60", "other" = "gray80"),
                        breaks = c("TRN", "PRD (CV2)", "PRD (CV1)"))+
     guides(alpha = 'none')+
+    coord_flip()+
     theme_light()+
-    theme(axis.text = element_text(size = 14),
-          axis.title = element_text(size = 18, face = 'bold'),
-          legend.text = element_text(size = 14),
-          legend.title = element_text(size = 18, face = 'bold'))
+    theme(axis.text = element_text(size = 10),
+          axis.title = element_text(size = 12, face = 'bold'),
+          legend.text = element_text(size = 10),
+          legend.title = element_text(size = 12, face = 'bold'))
+
+  girafe(ggobj = p)
+}
+
+cv0_radial_plot <- function(aux_out, k, target_env, top = TRUE, cv0_only = FALSE) {
+
+  trn_envs <- sort(unique(aux_out$EID[aux_out$Set == "TRN"]))
+  n_envs   <- length(trn_envs)
+
+  # Target env PRD candidates
+  prd_cands <- aux_out %>% filter(EID == target_env, Set == "PRD")
+  if (cv0_only) prd_cands <- prd_cands %>% filter(new_gen == FALSE)
+
+  trn_obs <- aux_out %>%
+    filter(Set == "TRN") %>%
+    group_by(GID) %>%
+    summarize(first_env = sort(unique(as.character(EID)))[1],
+              n_envs    = n_distinct(EID), .groups = "drop") %>%
+    mutate(obs_label = case_when(
+      n_envs == 1 ~ paste0("Observed in: ", first_env),
+      TRUE        ~ paste0("Observed in: ", first_env, " and ", n_envs - 1, " other(s)")
+    ))
+
+  prd_ranked <- prd_cands %>%
+    mutate(target_rank = rank(-yHat, ties.method = "random")) %>%
+    arrange(target_rank) %>%
+    left_join(trn_obs %>% dplyr::select(GID, obs_label), by = "GID") %>%
+    mutate(obs_label = if_else(new_gen | is.na(obs_label), "Never observed in training", obs_label))
+
+  n_genos   <- nrow(prd_ranked)
+  top_k_gids <- if (top) {
+    prd_ranked %>% slice_head(n = k) %>% pull(GID)
+  } else {
+    prd_ranked %>% slice_tail(n = k) %>% pull(GID)
+  }
+
+  r_in       <- 0.4
+  r_out      <- 0.8
+  label_r    <- 0.93
+  sector_gap <- 0.15
+  sector_span <- (2 * pi / n_envs) * (1 - sector_gap)
+
+  inner_list <- list()
+  outer_list <- list()
+  lines_list <- list()
+
+  for (ei in seq_along(trn_envs)) {
+    env           <- trn_envs[ei]
+    sector_center <- (ei - 1) / n_envs * 2 * pi - pi / 2
+
+    # Inner: target env genotypes ranked by target yHat
+    inner_angles <- sector_center - sector_span / 2 +
+      (prd_ranked$target_rank / (n_genos + 1)) * sector_span
+
+    inner_df <- prd_ranked %>%
+      mutate(
+        angle      = inner_angles,
+        x          = r_in * cos(angle),
+        y          = r_in * sin(angle),
+        ring       = "inner",
+        sector_env = env,
+        is_topk    = GID %in% top_k_gids,
+        color_group = case_when(!is_topk ~ "other", new_gen ~ "PRD (CV00)", TRUE ~ "PRD (CV0)"),
+        tooltip    = paste0("GID: ", GID, " | EID: ", target_env, "\nyHat: ", round(yHat, 3), "\n", obs_label)
+      )
+
+    # Outer: same genotypes ranked by TRN env yHat
+    trn_data <- aux_out %>%
+      filter(EID == env, Set == "TRN", GID %in% prd_ranked$GID) %>%
+      mutate(trn_rank = rank(-yHat, ties.method = "random")) %>%
+      arrange(trn_rank)
+
+    if (nrow(trn_data) == 0) next
+    n_trn <- nrow(trn_data)
+
+    outer_angles <- sector_center - sector_span / 2 +
+      (trn_data$trn_rank / (n_trn + 1)) * sector_span
+
+    outer_df <- trn_data %>%
+      left_join(prd_ranked %>% dplyr::select(GID, obs_label), by = "GID") %>%
+      mutate(
+        angle      = outer_angles,
+        x          = r_out * cos(angle),
+        y          = r_out * sin(angle),
+        ring       = "outer",
+        sector_env = env,
+        is_topk    = GID %in% top_k_gids,
+        color_group = if_else(is_topk, "TRN", "other"),
+        tooltip    = paste0("GID: ", GID, " | EID: ", env, "\nyHat: ", round(yHat, 3), "\n", obs_label)
+      )
+
+    line_df <- inner_df %>%
+      dplyr::select(GID, x, y, is_topk) %>%
+      dplyr::rename(x_in = x, y_in = y) %>%
+      inner_join(outer_df %>% dplyr::select(GID, x, y) %>% dplyr::rename(x_out = x, y_out = y),
+                 by = "GID")
+
+    inner_list[[ei]] <- inner_df
+    outer_list[[ei]] <- outer_df
+    lines_list[[ei]] <- line_df
+  }
+
+  all_inner <- bind_rows(inner_list)
+  all_outer <- bind_rows(outer_list)
+  all_lines <- bind_rows(lines_list)
+
+  sector_labels <- data.frame(
+    env   = trn_envs,
+    angle = (seq_along(trn_envs) - 1) / n_envs * 2 * pi - pi / 2
+  ) %>% mutate(
+    x     = label_r * cos(angle),
+    y     = label_r * sin(angle),
+    hjust = case_when(cos(angle) >  0.1 ~ 0, cos(angle) < -0.1 ~ 1, TRUE ~ 0.5),
+    vjust = case_when(sin(angle) >  0.1 ~ 0, sin(angle) < -0.1 ~ 1, TRUE ~ 0.5)
+  )
+
+  color_vals <- c("TRN" = "#0021A5", "PRD (CV0)" = "#FA4616",
+                  "PRD (CV00)" = "#27AE60", "other" = "gray80")
+
+  p <- ggplot() +
+    annotate("path",
+             x = r_in  * cos(seq(0, 2 * pi, length.out = 300)),
+             y = r_in  * sin(seq(0, 2 * pi, length.out = 300)),
+             color = "gray90", linewidth = 0.3) +
+    annotate("path",
+             x = r_out * cos(seq(0, 2 * pi, length.out = 300)),
+             y = r_out * sin(seq(0, 2 * pi, length.out = 300)),
+             color = "gray90", linewidth = 0.3) +
+    geom_segment(data = filter(all_lines, !is_topk),
+                 aes(x = x_in, xend = x_out, y = y_in, yend = y_out),
+                 color = "gray60", alpha = 0.25, linewidth = 0.25) +
+    geom_segment(data = filter(all_lines,  is_topk),
+                 aes(x = x_in, xend = x_out, y = y_in, yend = y_out),
+                 color = "black", linewidth = 0.8) +
+    geom_point_interactive(data = filter(all_inner, !is_topk),
+                           aes(x = x, y = y, tooltip = tooltip, data_id = GID),
+                           color = "gray80", size = 0.8, alpha = 0.5) +
+    geom_point_interactive(data = filter(all_outer, !is_topk),
+                           aes(x = x, y = y, tooltip = tooltip, data_id = GID),
+                           color = "gray80", size = 0.8, alpha = 0.5) +
+    geom_point_interactive(data = filter(all_inner, is_topk),
+                           aes(x = x, y = y, color = color_group,
+                               tooltip = tooltip, data_id = GID), size = 2.5) +
+    geom_point_interactive(data = filter(all_outer, is_topk),
+                           aes(x = x, y = y, color = color_group,
+                               tooltip = tooltip, data_id = GID), size = 2.5) +
+    geom_text(data = sector_labels,
+              aes(x = x, y = y, label = env, hjust = hjust, vjust = vjust),
+              size = 3.5, fontface = "bold") +
+    scale_color_manual(name = "Set", values = color_vals,
+                       breaks = c("TRN", "PRD (CV0)", "PRD (CV00)")) +
+    coord_equal(xlim = c(-1.1, 1.1), ylim = c(-1.1, 1.1)) +
+    theme_void() +
+    theme(legend.text  = element_text(size = 12),
+          legend.title = element_text(size = 14, face = "bold"))
+
+  girafe(ggobj = p)
 }
 
 cv0_pred_plot <- function(aux_out, k, target_env, top = TRUE, sc = TRUE, cv0_only = FALSE){
@@ -215,10 +387,12 @@ cv0_pred_plot <- function(aux_out, k, target_env, top = TRUE, sc = TRUE, cv0_onl
       ungroup() %>% mutate(yHat = (yHat-ymean)/ysd)
   }
 
-  df %>% ggplot(aes(x = EID, y = yHat, color = color_group, alpha = hl))+
-    geom_point(data = subset(df, color_group == "other"), size = 3)+
+  p <- df %>% ggplot(aes(x = EID, y = yHat, color = color_group, alpha = hl,
+                         tooltip = paste0("GID: ", GID, "\nyHat: ", round(yHat, 3)),
+                         data_id = GID))+
+    geom_point_interactive(data = subset(df, color_group == "other"), size = 3)+
     geom_line(data = filter(df, hl), aes(group = GID), color = 'black')+
-    geom_point(data = subset(df, color_group != "other"), size = 3)+
+    geom_point_interactive(data = subset(df, color_group != "other"), size = 3)+
     scale_alpha_manual(values = c(0.15, 1))+
     scale_color_manual(name = "Set",
                        values = c("TRN" = "#0021A5", "PRD (CV0)" = "#FA4616", "PRD (CV00)" = "#27AE60", "other" = "gray80"),
@@ -230,4 +404,6 @@ cv0_pred_plot <- function(aux_out, k, target_env, top = TRUE, sc = TRUE, cv0_onl
           axis.title = element_text(size = 18, face = 'bold'),
           legend.text = element_text(size = 14),
           legend.title = element_text(size = 18, face = 'bold'))
+
+  girafe(ggobj = p)
 }

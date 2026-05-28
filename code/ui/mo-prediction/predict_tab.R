@@ -25,6 +25,8 @@ library(shinydashboard)
 library(DT)
 library(shinyjqui)
 library(shinyjs)
+library(ggiraph)
+library(ggbeeswarm)
 
 source("code/functions/utils.R")
 
@@ -186,7 +188,7 @@ data_view_panel2 <- tabsetPanel(
         width = 6,
         height = "620px",
         title = '',
-        div(plotOutput("predict_plot", height = "550px")))
+        div(girafeOutput("predict_plot", height = "550px")))
     )
   )
 )
@@ -200,6 +202,12 @@ predict_tab <- tabItem(
   fluidRow(
     upload_y_box2,
     upload_omics_box2
+  ),
+  box(
+    width = 15,
+    class = "upload-box",
+    title = "Prediction Progress",
+    verbatimTextOutput("predict_logs", placeholder = TRUE)
   ),
   tags$hr(class="separator"),
   interpretation_guide_ui,

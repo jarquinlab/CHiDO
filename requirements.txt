@@ -17,3 +17,5 @@ DT
 zip
 markdown
 BGLR
+ggiraph
+ggbeeswarm

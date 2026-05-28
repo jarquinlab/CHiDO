@@ -28,6 +28,8 @@ library(dplyr)
 library(ggplot2)
 library(BGLR)
 library(gridExtra)
+library(ggiraph)
+library(ggbeeswarm)
 
 ### Loading source files ----
 
@@ -81,10 +83,10 @@ server <- function(input, output, session) {
   # Generate a dynamic upload panel based on model type selected
   output$y_panel<-renderUI({
     if (input$modtype%in%"Genotype level"){
-      panel<-div(create_input_box('*Genotype ID column:', "gid_col", 1),
-                 create_input_box("*Environment ID column:", "eid_col", 2),
-                 create_input_box("Individual ID (UID) column:", "uid_col"),
-                 create_input_box("*Target trait column:", "trait_col", 3))
+      panel<-div(create_input_box("*Environment ID column:", "eid_col", 1),
+                 create_input_box('*Genotype ID column:', "gid_col", 2),
+                 create_input_box("Individual ID (UID) column:", "uid_col", 3),
+                 create_input_box("*Target trait column:", "trait_col", 4))
     }else if(input$modtype%in%"Combining ability"){
       
       panel<-div(create_input_box('*Genotype ID column:', "gid_col", 1),
@@ -1174,7 +1176,12 @@ server <- function(input, output, session) {
   
   # Render log messages reactively
   output$cv_logs <- renderText({
-    invalidateLater(1000, session)  # Check for updates every second
+    invalidateLater(1000, session)
+    logs()
+  })
+
+  output$predict_logs <- renderText({
+    invalidateLater(1000, session)
     logs()
   })
   
@@ -1364,7 +1371,8 @@ server <- function(input, output, session) {
   observeEvent(input$run_predictions, {
     req(input$run_predictions)
     req(nrow(predict_prompt()) > 0)
-    print('run_predictions entered')
+    logging(session, target = "predict_logs")
+    logging(session, "[Step 1/5] Preparing prediction data...", target = "predict_logs")
 
     predict_ds <- predict_helper(trn_list = data_sources(), prd_list = data_sources2(),
                    phen_list = phen_data(), prompt = predict_prompt(),
@@ -1394,9 +1402,8 @@ server <- function(input, output, session) {
     ydata <- predict_ds$phen_merged
     labels <- unique(unlist(model_equation))
     
-    # Loop through unique matrices to create G matrices
+    logging(session, "[Step 2/5] Computing G matrices...", target = "predict_logs")
     for (label in labels) {
-      # Get the ID column shared by omic and Y data
       curr_term <- ds[[label]]
       curr_term$y_col <- get_join_id(curr_term, ydata[!names(ydata) %in% "data"])
       if (is.null(curr_term$y_col)) {
@@ -1404,7 +1411,7 @@ server <- function(input, output, session) {
                          type = "error")
         return()
       }
-      
+      logging(session, paste0("  ==> ", label), target = "predict_logs")
       result <- create_g_matrix(curr_term, ydata, wht, ctr, std, nan_freq, prop_maf_j)
       G <- result[["G"]]
       EVD <- result[["EVD"]]
@@ -1416,21 +1423,24 @@ server <- function(input, output, session) {
       save(EVD, file = file.path(outdir, "EVD.rda"))
     }
     
+    logging(session, "[Step 3/5] Computing interaction matrices...", target = "predict_logs")
     for (i in seq_along(model_equation)) {
       if (length(model_equation[[i]]) > 1 & is.vector(model_equation[[i]])) {
         term <- paste(model_equation[[i]], collapse = "_")
+        logging(session, paste0("  ==> ", term), target = "predict_logs")
         result <- create_interaction_matrix(model_equation[[i]], tmpdir)
-        
+
         outdir <- file.path(tmpdir, term)
         if (!dir.exists(outdir)) { dir.create(outdir, recursive = TRUE)}
-        
+
         G <- result[["G"]]
         EVD<-eigen(G,symmetric = TRUE)
         save(G, file=file.path(outdir,"G.rda"))
         save(EVD, file=file.path(outdir,"EVD.rda"))
       }
     }
-    
+
+    logging(session, "[Step 4/5] Running predictive model...", target = "predict_logs")
     cv_ids <- prep_data_for_cv(ydata, folds, cv1, cv2, cv0, cv00,seed)
     all_terms <- sapply(model_equation, function(x) paste(x, collapse="_"))
     fm <- get_predictions2(cv_ids, tmpdir, model_selected, all_terms, folds=folds, nIter=nIter,
@@ -1445,9 +1455,10 @@ server <- function(input, output, session) {
     }
     dir.create(model_dir, recursive = TRUE)  
     
+    logging(session, "[Step 5/5] Writing results...", target = "predict_logs")
     write.csv(files$prompt_out, file = file.path(model_dir, "prediction_prompt.csv"), row.names = FALSE)
     write.csv(files$aux_out, file = file.path(model_dir, "prediction_main.csv"), row.names = FALSE)
-    showNotification('hecho todo', type = 'message')
+    logging(session, "Predictions complete! View results in the Results tab.", target = "predict_logs")
   })
   
   predict_files_reactive <- reactivePoll(
@@ -1530,9 +1541,14 @@ server <- function(input, output, session) {
   })
   output$predict_cv_options <- renderUI({
     req(input$predict_plot_cv)
-    
+
     model_dir <- file.path(tmpdir, "output_predict", input$selected_model)
     file_path <- file.path(model_dir, "prediction_main.csv")
+
+    if (is.null(input$selected_model) || input$selected_model == "" || !file.exists(file_path)) {
+      return(p("No predictions have been made yet.", style = "color: gray; font-style: italic;"))
+    }
+
     aux_out <- read.csv(file_path)
     new_envs <- setdiff(aux_out$EID, filter(aux_out, Set %in% 'TRN')$EID)
     
@@ -1541,13 +1557,13 @@ server <- function(input, output, session) {
         h4("CV2/CV1 Visualization Settings"),
         sliderInput(
           "p_sel_cv1",
-          "Highlight Top % of New Genotypes:", 
+          "% of genotypes to discard:",
           min = 0,
-          max = 100, 
-          value = 20, 
-          post = "%" 
+          max = 100,
+          value = 80,
+          post = "%"
         ),
-        helpText("Adjust the percentage of new genotypes to highlight based on their predicted performance within environments."),
+        helpText("Slide right to discard more genotypes and focus on the top candidates. At 80%, only the top 20% are highlighted."),
         
         radioButtons(
           "top_cv1",
@@ -1595,17 +1611,14 @@ server <- function(input, output, session) {
         ),
         helpText("Select whether a higher or lower predicted trait value is desirable when determining the 'top' genotypes (e.g., higher yield vs. lower disease score)."),
 
-        radioButtons(
-          "sc_cv0",
-          "Scale Data for Plot?",
-          choices = c(
-            "Yes" = TRUE,
-            "No" = FALSE
-          ),
-          selected = TRUE,
-          inline = TRUE
-        ),
-        helpText("Enable scaling to normalize prediction values, which can improve visualization across different environments."),
+        # DEPRECATED: scaling not applicable to radial plot layout
+        # radioButtons(
+        #   "sc_cv0",
+        #   "Scale Data for Plot?",
+        #   choices = c("Yes" = TRUE, "No" = FALSE),
+        #   selected = TRUE,
+        #   inline = TRUE
+        # ),
 
         checkboxInput(
           "cv0_only",
@@ -1626,7 +1639,7 @@ server <- function(input, output, session) {
     }
   )
   
-  output$predict_plot <- renderPlot({
+  output$predict_plot <- renderGirafe({
     req(input$selected_model, input$predict_plot_cv)
 
     model_dir <- file.path(tmpdir, "output_predict", input$selected_model)
@@ -1639,10 +1652,10 @@ server <- function(input, output, session) {
 
     if (input$predict_plot_cv == "CV2/CV1") {
       req(input$p_sel_cv1)
-      cv1_pred_plot(aux_out, input$p_sel_cv1 / 100, input$top_cv1)
+      cv1_pred_plot(aux_out, (100 - input$p_sel_cv1) / 100, input$top_cv1)
     } else if (input$predict_plot_cv == "CV0/CV00") {
       req(input$new_env_cv0)
-      cv0_pred_plot(aux_out, input$k_cv0, input$new_env_cv0, input$top_cv0, input$sc_cv0, isTRUE(input$cv0_only))
+      cv0_radial_plot(aux_out, input$k_cv0, input$new_env_cv0, input$top_cv0, isTRUE(input$cv0_only))
     }
   })
   
@@ -1651,9 +1664,9 @@ server <- function(input, output, session) {
   ### GEI Data tab ----
   # Generate a dynamic upload panel to select columns
   output$gei_y_panel<-renderUI({
-      panel<-div(create_input_box('*Genotype ID column:', "gid_col", 1),
-                 create_input_box("*Environment ID column:", "eid_col", 2),
-                 create_input_box("*Individual ID (UID) column:", "uid_col",3),
+      panel<-div(create_input_box("*Environment ID column:", "eid_col", 1),
+                 create_input_box('*Genotype ID column:', "gid_col", 2),
+                 create_input_box("*Individual ID (UID) column:", "uid_col", 3),
                  create_input_box("*Target trait column:", "trait_col", 4))
   })
   

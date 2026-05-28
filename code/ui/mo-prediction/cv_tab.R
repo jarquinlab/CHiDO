@@ -48,7 +48,7 @@ params_box <- box(
       ),
   sliderInput("burn_in_slider", label=NULL, min=0, max=5000, value=500, step=100),
   tags$hr(),
-  div(style="margin-top:20px;", checkboxInput("user_set_seed", label="Set seed?", value=FALSE),
+  div(style="margin-top:20px;", checkboxInput("user_set_seed", label="Set seed?", value=TRUE),
       conditionalPanel(
         condition="input.user_set_seed==true",
         div(style="display:flex; align-items:center; margin-top:-30px; padding:3px;",
