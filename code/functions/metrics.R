@@ -33,15 +33,12 @@ RMSE = function(x,y){
   return(sqrt(mean((x - y)^2)))
 }
 
-Tiezzi <- function(rs,ns){
-  top = 0
-  bot = 0
-  for (i in 1:length(rs)){
-    Vi = (1-rs[i])/(ns[i]-2)
-    top = top + rs[i]/Vi
-    bot = bot + 1/Vi
-  }
-  return(top/bot)
+Tiezzi = function(rs,ns){
+  keep = ns > 2 & !is.na(ns) & !is.na(rs)
+  if (!any(keep)) return(NA)
+  W = (ns-2)[keep]/(1-rs^2)[keep] #inverse of V = (1-r^2)/(n-2)
+  w = W/sum(W)
+  return(sum(w*rs[keep]))
 }
 
 weighted_mean <- function(x,w){
