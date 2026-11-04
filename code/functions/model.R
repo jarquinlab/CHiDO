@@ -72,7 +72,7 @@ filter_markers <- function(data, nan_freq, out_path = NULL) {
     nan_report <- data.frame(
       marker = colnames(data),
       count = colSums(is.na(data)),
-      percent = round((colSums(is.na(data)) * 100 / nrow(data)), 2)
+      percent = round((colSums(is.na(data)) * 100 / nrow(data)), 3)
     )
     
     # Create new directory if needed
@@ -519,7 +519,7 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
       # Predict with the fitted model
       preds <- data.frame(testing = testing, fold = paste0("CV1:",data$cv1[testing],"x","CV0:",data$cv0[testing],sep=" "), env = eid[testing],
                           individual = gid[testing], observed = y[testing],
-                          predicted = round(fm$yHat[testing],3))
+                          predicted = fm$yHat[testing])
       
       predictions <- rbind(predictions, preds)
     }
@@ -543,7 +543,7 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
       # Predict with the fitted model
       preds <- data.frame(testing = testing, fold = fold, env = eid[testing],
                           individual = gid[testing], observed = y[testing],
-                          predicted = round(fm$yHat[testing],3))
+                          predicted = fm$yHat[testing])
       
       predictions <- rbind(predictions, preds)
     }
@@ -568,7 +568,7 @@ fit_cv <- function(cv, cv_data, data, folds, predictions, eta, nIter, burnIn) {
         
         preds <- data.frame(testing = testing, fold = fold, env = eid[testing],
                             individual = gid[testing], observed = y[testing],
-                            predicted = round(fm$yHat[testing],3))
+                            predicted = fm$yHat[testing])
         # Add predictions to dataset
         predictions <- rbind(predictions, preds)
       }
