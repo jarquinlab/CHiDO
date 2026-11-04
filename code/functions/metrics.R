@@ -65,7 +65,7 @@ create_output_list <- function(eid_col, model_dir, out_dir, metric=NULL, interva
       
       if (metric == "accuracy") {
         output = tmp %>% group_by_at(eid_col) %>% 
-          summarise(n = n(), cor = round(cor(observed, predicted, use="complete.obs"),2)) %>%
+          summarise(n = n(), cor = round(cor(observed, predicted, use="complete.obs"),3)) %>%
           mutate(model = model, cv = gsub('.csv','',file))
       } else if (metric == "rmse") {
         output = tmp %>% group_by_at(eid_col) %>% 
@@ -95,7 +95,7 @@ get_model_accuracy <- function(eid_col, modeldir, group_by_env=FALSE) {
   
   # Overall accuracy
   tmp2 <- out_df %>% group_by(cv, model) %>% 
-    summarise(cor = round(Tiezzi(cor, n), 2), n = sum(n)) %>% 
+    summarise(cor = round(Tiezzi(cor, n), 3), n = sum(n)) %>% 
     mutate(env = "all") %>% dplyr::select(cv, model, env, n, cor)
   
   out_df <- rbind(out_df, tmp2) %>% arrange(cv, model, env)
