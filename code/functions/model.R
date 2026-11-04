@@ -72,7 +72,7 @@ filter_markers <- function(data, nan_freq, out_path = NULL) {
     nan_report <- data.frame(
       marker = colnames(data),
       count = colSums(is.na(data)),
-      percent = round((colSums(is.na(data)) * 100 / nrow(data)), 3)
+      percent = round((colSums(is.na(data)) * 100 / nrow(data)), 2)
     )
     
     # Create new directory if needed
